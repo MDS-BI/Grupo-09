@@ -64,3 +64,11 @@ If the configuration is invalid (unknown types, bad keys, transitions referencin
 - Data is persisted to `localStorage` under the keys `erp_base_module:entities` and `erp_base_module:documents`.
 - Deleting an entity also deletes its documents (cascade).
 - This project intentionally uses vanilla HTML, CSS, and JavaScript for simplicity.
+**
+
+El problema:
+El sistema ERP base carece de un componente financiero nativo que permita gestionar el dinero de forma centralizada. Las empresas necesitan registrar transacciones contables complejas (asegurando el principio de partida doble) y mantener una trazabilidad exacta sin desconectar estos datos financieros del resto de los departamentos y empleados de la organización.
+La solución
+Un módulo escalable de Contabilidad y Finanzas desarrollado mediante metodologías ágiles e IA (Spec-Driven Development). Integra un diseño de base de datos relacional (MER) que conecta directamente con la estructura de usuarios y departamentos del ERP actual, y ofrece un dashboard web interactivo para visualizar métricas en tiempo real, administrar el plan de cuentas y registrar movimientos financieros.
+Usuario objetivo
+Gerentes de finanzas (CFOs), contadores, analistas y auditores. Son perfiles corporativos que requieren interfaces claras e indicadores precisos (ingresos, gastos, saldos) para auditar registros diarios, conciliar cuentas y tomar decisiones económicas fundamentadas.
