@@ -13,3 +13,11 @@ Como Analista Contable, quiero administrar un catálogo jerárquico de cuentas (
 **Escenarios de Aceptación**:
 1. Dado el formulario de cuenta, cuando el usuario introduce un código único (ej. "1.1.1") y los datos requeridos, entonces la cuenta se persiste y aparece en el catálogo.
 2. Dado un código de cuenta que ya existe, cuando el usuario intenta guardarlo, entonces se muestra un error de validación por duplicidad y no se persiste.
+
+### Historia de Usuario 5 - Flujo de Aprobación de Asientos (Prioridad: P2)
+Como Gerente de Finanzas, quiero revisar los asientos que están en estado "Borrador" o "Pendiente" para aprobarlos y contabilizarlos formalmente, garantizando que los movimientos cumplan con las políticas.
+*Por qué esta prioridad*: Refleja los controles internos y segregación de funciones del mundo real.
+*Prueba Independiente*: Un usuario con rol de aprobación cambia el estado de un asiento de "Pendiente" a "Aprobada", registrando su firma de auditoría.
+*Escenarios de Aceptación*:
+1. Dado un asiento en estado "Borrador", cuando se solicita aprobación, entonces cambia a "Pendiente" habilitando la revisión.
+2. Dado un intento de transición de "Borrador" directamente a "Contabilizada" saltando políticas, entonces el sistema rechaza la transición.
