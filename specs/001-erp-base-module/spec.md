@@ -21,3 +21,11 @@ Como Gerente de Finanzas, quiero revisar los asientos que están en estado "Borr
 *Escenarios de Aceptación*:
 1. Dado un asiento en estado "Borrador", cuando se solicita aprobación, entonces cambia a "Pendiente" habilitando la revisión.
 2. Dado un intento de transición de "Borrador" directamente a "Contabilizada" saltando políticas, entonces el sistema rechaza la transición.
+
+### Historia de Usuario 6 - Filtrado y Consulta Histórica (Prioridad: P2)
+Como Analista Contable, quiero buscar transacciones históricas filtrando por rango de fechas, cuenta contable, centro de costo (departamento) y estado, para agilizar las conciliaciones.
+*Por qué esta prioridad*: Permite el análisis y la explotación de los datos generados.
+*Prueba Independiente*: Un usuario busca asientos de un departamento específico y obtiene solo las coincidencias exactas.
+*Escenarios de Aceptación*:
+1. Dado un término o filtro válido aplicado en la búsqueda, cuando el usuario consulta, entonces se muestran solo las transacciones coincidentes.
+2. Dado un filtro que no arroja resultados, cuando el usuario busca, entonces se muestra un estado vacío claro con opción de limpiar filtros.
