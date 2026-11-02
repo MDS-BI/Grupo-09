@@ -13,7 +13,13 @@ Como Analista Contable, quiero administrar un catálogo jerárquico de cuentas (
 **Escenarios de Aceptación**:
 1. Dado el formulario de cuenta, cuando el usuario introduce un código único (ej. "1.1.1") y los datos requeridos, entonces la cuenta se persiste y aparece en el catálogo.
 2. Dado un código de cuenta que ya existe, cuando el usuario intenta guardarlo, entonces se muestra un error de validación por duplicidad y no se persiste.
-
+### Historia de Usuario 3 - Registro por Partida Doble (Prioridad: P1)
+Como Analista Contable, quiero crear asientos contables de múltiples líneas que exijan estrictamente que la suma del Debe sea igual al Haber antes de guardar, para garantizar la integridad de los datos.
+*Por qué esta prioridad*: Es la regla de negocio más crítica y el núcleo funcional del módulo.
+*Prueba Independiente*: Un usuario crea una transacción con dos líneas, cuadra los montos y la guarda exitosamente.
+*Escenarios de Aceptación*:
+1. Dado un asiento en edición, cuando la suma total del Debe es igual a la suma total del Haber (y hay ≥2 líneas), entonces el sistema permite guardar la transacción.
+2. Dado un asiento desbalanceado (Σ Debe ≠ Σ Haber), cuando el usuario intenta guardar, entonces se bloquea la acción con un error claro y no se persiste nada.
 ### Historia de Usuario 5 - Flujo de Aprobación de Asientos (Prioridad: P2)
 Como Gerente de Finanzas, quiero revisar los asientos que están en estado "Borrador" o "Pendiente" para aprobarlos y contabilizarlos formalmente, garantizando que los movimientos cumplan con las políticas.
 *Por qué esta prioridad*: Refleja los controles internos y segregación de funciones del mundo real.
