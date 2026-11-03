@@ -20,6 +20,13 @@ Como Analista Contable, quiero crear asientos contables de múltiples líneas qu
 *Escenarios de Aceptación*:
 1. Dado un asiento en edición, cuando la suma total del Debe es igual a la suma total del Haber (y hay ≥2 líneas), entonces el sistema permite guardar la transacción.
 2. Dado un asiento desbalanceado (Σ Debe ≠ Σ Haber), cuando el usuario intenta guardar, entonces se bloquea la acción con un error claro y no se persiste nada.
+### Historia de Usuario 4 - Auditoría y Reversas (Prioridad: P1)
+Como Auditor, quiero que los asientos ya contabilizados sean inmutables y que cualquier corrección exija un nuevo asiento de reversa enlazado al original, para mantener un rastro de auditoría transparente y evitar alteraciones ocultas.
+*Por qué esta prioridad*: Cumplimiento normativo y seguridad de la información financiera.
+*Prueba Independiente*: Un usuario intenta editar un asiento contabilizado y es bloqueado; luego aplica una reversa y se genera un nuevo asiento compensatorio.
+*Escenarios de Aceptación*:
+1. Dado un asiento en estado "Contabilizada", cuando el usuario intenta editar sus montos o cuentas, entonces la interfaz bloquea la edición por inmutabilidad.
+2. Dado un asiento "Contabilizada", cuando el usuario ejecuta la acción "Revertir", entonces se crea un nuevo asiento con los montos invertidos, referenciando el id_transaccion original.
 ### Historia de Usuario 5 - Flujo de Aprobación de Asientos (Prioridad: P2)
 Como Gerente de Finanzas, quiero revisar los asientos que están en estado "Borrador" o "Pendiente" para aprobarlos y contabilizarlos formalmente, garantizando que los movimientos cumplan con las políticas.
 *Por qué esta prioridad*: Refleja los controles internos y segregación de funciones del mundo real.
