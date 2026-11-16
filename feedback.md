@@ -25,6 +25,7 @@ Proximos pasos:
 
 Feedback Avance 03 (16/11/26)
 
+- No hubo implementacion a la fecha de revision, fue ingresada manualmente por el profesor.
 - Cambios en la especificación: spec.md pasó de 4 US a 12 (formato Spec Kit con FR-001–FR-040 y SC-001–SC-018) y tasks.md a 76 tareas (T001–T076) enlazadas a FR/SC. Es coherente entre ambos, pero siguen todas sin marcar ([ ]) pese a que hay implementación.
 - Consistencia sitio–especificación: hacer /speckit.analyze para verificar inconsistencia entre tareas.
 - hacer mejoras de funcionalidad e interfaz de usuario, incluir data simulada para probar campos, incluir mejoras de estilo, transicion, navegacion, etcetera.
