@@ -6,10 +6,19 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview --port 4173",
-    "test": "vitest"
+    "test": "vitest",
+    "test:run": "vitest run",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write \"src/**/*.{js,css}\" \"tests/**/*.{js,css}\" \"*.{js,mjs,html,json}\" --no-error-on-unmatched-pattern",
+    "format:check": "prettier --check \"src/**/*.{js,css}\" \"tests/**/*.{js,css}\" \"*.{js,mjs,html,json}\" --no-error-on-unmatched-pattern"
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "eslint": "^10.15.0",
+    "globals": "^17.14.0",
     "jsdom": "^30.0.1",
+    "prettier": "^3.10.1",
     "vite": "^8.2.1",
     "vitest": "^4.1.10"
   }

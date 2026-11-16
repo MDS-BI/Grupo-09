@@ -13,6 +13,7 @@ Construir el Módulo de Contabilidad y Finanzas para el sistema ERP utilizando u
 **Dependencias Principales**: Vite, sin framework de interfaz pesado  
 **Almacenamiento**: localStorage del navegador para una instancia del módulo de espacio único  
 **Pruebas**: Vitest con jsdom para pruebas unitarias y de interacción  
+**Calidad de Código**: ESLint 10 (configuración plana) y Prettier 3 como análisis estático y formato obligatorios; se verifican con `npm run lint` y `npm run format:check`  
 **Plataforma Objetivo**: Navegadores modernos de escritorio y móviles  
 **Tipo de Proyecto**: Aplicación web  
 **Objetivos de Rendimiento**: Interacciones responsivas para listas de hasta 500 registros; la búsqueda y las actualizaciones de la interfaz deben sentirse instantáneas  
@@ -23,7 +24,7 @@ Construir el Módulo de Contabilidad y Finanzas para el sistema ERP utilizando u
 
 *COMPROBACIÓN: Debe pasar antes de la investigación de la Fase 0. Reverificar tras el diseño de la Fase 1.*
 
-- Calidad: La implementación usará una estructura JavaScript pequeña y modular con límites de función claros y nomenclatura consistente, manteniendo las preocupaciones base (almacenamiento, identidad, integridad referencial) separadas de la lógica específica del dominio para que los módulos personalizados puedan extenderlas.
+- Calidad: La implementación usará una estructura JavaScript pequeña y modular con límites de función claros y nomenclatura consistente, manteniendo las preocupaciones base (almacenamiento, identidad, integridad referencial) separadas de la lógica específica del dominio para que los módulos personalizados puedan extenderlas. El repositorio incorpora ESLint y Prettier (`eslint.config.mjs`, `.prettierrc.json`) y los aplica como puertas de calidad obligatorias mediante `npm run lint` y `npm run format:check`, junto con `npm test` y `npm run build`.
 - Pruebas: Los flujos centrales de crear, editar, eliminar y buscar estarán cubiertos por pruebas automatizadas antes de completar.
 - Experiencia de Usuario: La interfaz proporcionará mensajes de validación claros, estados vacíos y comportamiento de formulario consistente, presentados dentro de un marco de espacio de trabajo ERP con marca (barra superior + barra lateral) que se ve y se comporta idénticamente en todas las pantallas.
 - Rendimiento: La búsqueda y el renderizado de listas se optimizarán para colecciones de hasta 500 registros usando actualizaciones ligeras del DOM.

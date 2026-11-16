@@ -19,6 +19,7 @@
 - JavaScript (ES2022) + HTML + CSS, Vite, no UI framework
 - Persistence: `localStorage` (single-instance module)
 - Testing: Vitest + jsdom
+- Quality: ESLint 10 (flat config) + Prettier 3, enforced with `npm run lint` and `npm run format:check`
 - Workspace shell: top bar + sidebar shared across all views (already present in `index.html` / `src/main.js`)
 - Money: exact decimal arithmetic with up to 4 decimals — never floating point
 
@@ -70,6 +71,7 @@ tests/
 - [ ] T002 [P] Configure Vitest + jsdom environment and DOM helpers in `vitest.config.mjs` and `tests/setup/dom.js`
 - [ ] T003 [P] Create module configuration (labels in Spanish, state lifecycle `Borrador → Pendiente → Aprobada → Contabilizada → Revertida`, accent color token) in `src/module-config.js`
 - [ ] T004 [P] Create generic localStorage collection layer with `loadCollection/saveCollection/addRecord/updateRecord/deleteRecord`, auto ids and ISO timestamps in `src/storage.js`
+- [ ] T004A [P] Configure ESLint flat config and Prettier (browser/node globals, build-output ignores) plus `lint`, `lint:fix`, `format` and `format:check` scripts in `eslint.config.mjs`, `.prettierrc.json`, `.prettierignore` and `package.json`
 
 ---
 
@@ -204,7 +206,7 @@ tests/
 
 - [ ] T041 [P] Audit Spanish UI copy and ERP shell consistency (top bar + sidebar identical across all views) in `src/components/shell.js` and `src/module-config.js`
 - [ ] T042 Verify persistence integrity across reloads (no loss, no duplication) with a test in `tests/integration/persistence.test.js`
-- [ ] T043 Run full validation: `npm test`, `npm run build`, and manual walkthrough of `specs/001-erp-base-module/quickstart.md` scenarios
+- [ ] T043 Run full validation: `npm test`, `npm run lint`, `npm run format:check`, `npm run build`, and manual walkthrough of `specs/001-erp-base-module/quickstart.md` scenarios
 - [ ] T044 [P] Update `README.md` with module features, scripts and extension points
 
 ---
@@ -238,7 +240,7 @@ tests/
 
 ### Parallel Opportunities
 
-- Phase 1: T002, T003, T004 in parallel (different files)
+- Phase 1: T002, T003, T004, T004A in parallel (different files)
 - Phase 2: T005, T006, T007, T009, T010 in parallel
 - US1: T011 ∥ T012 (metrics service ∥ dashboard component)
 - US2: T016 ∥ T017 (model ∥ unit tests)
@@ -317,5 +319,6 @@ Task: "Create integration tests in tests/integration/dashboard-metrics.test.js"
 - [Story] label maps task to specific user story for traceability
 - Money arithmetic must use exact decimals (`src/utils/money.js`) — never floating point (Assumption)
 - Authorization checks live in services (`approval-service.js`, `entry-service.js`), never only in the UI (FR-020)
+- Run `npm run lint` and `npm run format:check` before considering any task complete; add `npm test` and `npm run build` before a story checkpoint
 - Commit after each task or logical group
 - Stop at any checkpoint to validate the story independently
