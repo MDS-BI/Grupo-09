@@ -1,6 +1,6 @@
 # Feature Specification: Módulo de Contabilidad y Finanzas
 
-**Feature Branch**: `002-contabilidad-finanzas`
+**Feature Branch**: `001-erp-base-module`
 
 **Created**: 2026-11-03
 
@@ -248,10 +248,23 @@ Como Gerente de Finanzas, quiero configurar el período contable activo por defe
 - **FR-027**: El sistema MUST conservar los datos registrados al cerrar y volver a abrir el módulo, sin pérdidas ni duplicaciones.
 - **FR-028**: El sistema MUST mostrar mensajes de validación claros y conservar los datos ya introducidos por el usuario cuando una operación sea rechazada.
 - **FR-029**: El sistema MUST presentar la interfaz en español y mantener la navegación y el estilo del espacio de trabajo del ERP existente.
+- **FR-030**: El sistema MUST mostrar en la vista de Centros de Costo los totales de ingresos, gastos y saldo neto por cada departamento del catálogo ERP, calculados únicamente a partir de asientos en estado "Contabilizada" del período seleccionado. Los departamentos sin movimientos MUST mostrarse con $0.00 y las líneas sin centro de costo MUST agruparse en una categoría explícita "Sin departamento", de modo que la suma por departamento concilie con los totales de ingresos y gastos del período (consolida FR-010, FR-022 y FR-024).
+- **FR-031**: El sistema MUST generar un Estado de Resultados por período que agrupe los saldos de las cuentas de tipo Ingreso y Egreso con movimientos contabilizados, excluya los asientos en estado distinto de "Contabilizada" y calcule la utilidad o pérdida neta con precisión decimal exacta de cuatro decimales (consolida el cálculo de resultado neto de FR-001).
+- **FR-032**: El sistema MUST generar un Flujo de Caja por período a partir de las cuentas designadas como efectivo/bancos, usando el mismo conjunto de asientos contabilizados que FR-001 y FR-031, y MUST excluir los asientos en estado "Borrador", "Pendiente", "Aprobada" y "Revertida".
+- **FR-033**: La designación de cuentas de efectivo/bancos MUST basarse en el atributo explícito `es_efectivo` de Cuenta_Contable y no en el nombre o código de la cuenta; el mismo criterio MUST alimentar el flujo de caja del panel (FR-001) y el reporte de Flujo de Caja (FR-032) para evitar discrepancias entre ambas vistas. La designación aplicable es la vigente en el catálogo al momento de calcular, y todo cambio del atributo MUST quedar auditado.
+- **FR-034**: El sistema MUST impedir la eliminación de cualquier cuenta referenciada por al menos una línea de asiento, independientemente del estado del asiento (incluidos "Borrador" y "Pendiente"), y MUST ofrecer su desactivación como alternativa segura; esta regla consolida y amplía FR-008.
+- **FR-035**: La validación de jerarquía MUST impedir autorreferencias y ciclos directos o indirectos al asignar una cuenta padre, MUST ejecutarse en la capa de servicio y MUST proteger el recorrido del árbol frente a datos heredados con ciclos sin provocar recursión infinita; consolida y endurece FR-006.
+- **FR-036**: El sistema MUST validar cada línea de asiento antes y durante el guardado: cuenta activa y que acepte movimientos, exactamente un lado (Debe xor Haber), importe mayor que cero y máximo cuatro decimales. Los valores nulos, negativos, cero o con más de cuatro decimales MUST rechazarse con un mensaje claro, sin redondeo automático, conservando los datos ya introducidos y excluyendo las cuentas inactivas o no imputables de los selectores; consolida FR-007, FR-011 y FR-028.
+- **FR-037**: El sistema MUST mantener una bitácora global e inmutable de eventos críticos que registre tipo de acción, fecha/hora, identificador del usuario activo y entidad afectada para la creación, transición de estado y reversa de asientos, así como para la creación, edición, desactivación y reactivación de cuentas. La vista de Auditoría MUST ser de solo lectura y MUST NOT ofrecer controles de edición o borrado; el historial por asiento exigido por FR-019 MUST resolverse como una consulta filtrada de esta misma bitácora.
+- **FR-038**: Los usuarios MUST poder configurar y persistir un período contable activo (rango de fechas con presets de mes, trimestre o rango personalizado) que el Panel General y los Reportes MUST usar como período por defecto al cargarse; los valores inválidos o invertidos MUST rechazarse conservando la configuración anterior.
+- **FR-039**: El sistema MUST versionar el esquema de `localStorage`, validar la versión y la forma de los datos al cargar, migrar los estados sin versión de forma segura y restaurar cuentas, asientos y eventos sin pérdida, duplicación ni degradación de precisión. Ante una versión incompatible MUST conservar los datos existentes e informar al usuario, sin descartarlos silenciosamente; consolida y amplía FR-027.
+- **FR-040**: La vista de Configuración MUST mostrar el estado del almacenamiento local con la versión de esquema activa y los recuentos de cuentas, asientos y eventos, para que el usuario pueda verificar la integridad del respaldo local (FR-027, FR-039).
+
+**Consolidación con US1–US6**: FR-030–FR-033 reutilizan la fuente de asientos contabilizados y la regla de resultado/flujo de caja de FR-001; FR-034–FR-035 endurecen FR-006/FR-008 sin crear validaciones paralelas; FR-036 consolida FR-007/FR-011/FR-028; FR-037 reemplaza el historial aislado de FR-019 por una única bitácora global; FR-038–FR-040 amplían FR-027. Las reglas anteriores permanecen vigentes como base y no deben implementarse dos veces.
 
 ### Key Entities *(include if feature involves data)*
 
-- **Cuenta Contable**: Representa una cuenta del catálogo. Atributos clave: código único, nombre, tipo (Activo, Pasivo, Patrimonio, Ingreso o Egreso), naturaleza (Debe o Haber), cuenta padre opcional, indicador de aceptación de movimientos y estado activo/inactivo.
+- **Cuenta Contable**: Representa una cuenta del catálogo. Atributos clave: código único, nombre, tipo (Activo, Pasivo, Patrimonio, Ingreso o Egreso), naturaleza (Debe o Haber), cuenta padre opcional, indicador de aceptación de movimientos, designación explícita de efectivo/bancos (`es_efectivo`) y estado activo/inactivo.
 - **Asiento Contable (Transacción)**: Encabezado de una operación financiera. Atributos clave: fecha contable, tipo y número de documento, descripción, moneda, estado, usuario creador, usuario aprobador, fechas de creación/aprobación/contabilización y referencia al asiento revertido cuando corresponda.
 - **Línea de Asiento (Detalle de Transacción)**: Imputación individual de un asiento. Atributos clave: número de línea, cuenta contable, centro de costo opcional, importe de Debe, importe de Haber y glosa opcional.
 - **Usuario del ERP (dependencia compartida)**: Identidad existente que se referencia como creador o aprobador. No se crea, duplica ni administra dentro del módulo financiero.
@@ -271,6 +284,14 @@ Como Gerente de Finanzas, quiero configurar el período contable activo por defe
 - **SC-008**: Al menos el 85% de los usuarios autorizados completa el flujo de aprobación de un asiento en menos de 1 minuto.
 - **SC-009**: El 95% de las búsquedas con filtros válidos muestra resultados coincidentes sin incluir registros ajenos al criterio.
 - **SC-010**: Ningún asiento contabilizado pierde su trazabilidad ni queda sin reversa disponible tras una corrección.
+- **SC-011**: El 100% de los asientos contabilizados con centro de costo se refleja en la vista de Centros de Costo; los totales por departamento más la categoría "Sin departamento" concilian con los totales de ingresos y gastos del período, los departamentos sin movimientos muestran $0.00 y la vista se genera en menos de 2 segundos para 500 asientos contabilizados.
+- **SC-012**: El Estado de Resultados y el Flujo de Caja se generan en menos de 2 segundos para 500 asientos contabilizados, con resultado neto exacto a cuatro decimales y 0 asientos no contabilizados incluidos.
+- **SC-013**: El 100% de las cifras de flujo de caja del Panel General y del reporte de Flujo de Caja usa el mismo atributo de cuenta de efectivo/bancos, con 0 discrepancias entre ambas vistas.
+- **SC-014**: El 100% de los intentos de eliminar cuentas referenciadas por asientos (en cualquier estado) se bloquea y ofrece desactivación; 0 ciclos o autorreferencias quedan persistidos en la jerarquía.
+- **SC-015**: El 100% de los importes nulos, negativos, cero o con más de cuatro decimales se rechaza antes de persistir sin redondeo, y 0 cuentas inactivas o no imputables aparecen disponibles para selección en líneas de asiento; la validación de cada cambio de línea se actualiza en un máximo de 100 ms.
+- **SC-016**: El 100% de las acciones críticas sobre asientos y cuentas queda registrado en la bitácora con usuario y fecha/hora en un máximo de 1 segundo; 0 eventos de auditoría pueden editarse o eliminarse desde la interfaz.
+- **SC-017**: El período contable guardado persiste en el 100% de los recargos y es usado como período por defecto por el Panel General y los Reportes; 0 configuraciones inválidas se almacenan.
+- **SC-018**: Tras cerrar y reabrir la aplicación, el 100% de cuentas, asientos y eventos se restaura con la precisión original y sin duplicaciones; ante una versión de esquema incompatible, 0 registros existentes se descartan silenciosamente y el usuario recibe una explicación.
 
 ## Assumptions
 

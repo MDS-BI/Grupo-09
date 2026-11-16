@@ -34,6 +34,7 @@ erDiagram
         string naturaleza
         bigint id_cuenta_padre FK "Opcional"
         boolean acepta_movimientos
+        boolean es_efectivo "Por defecto false; FR-033"
         boolean activa
         timestamp creado_en
         timestamp actualizado_en
@@ -71,7 +72,12 @@ erDiagram
 
 ### Cuenta_Contable
 
-Catálogo de cuentas de la empresa. `codigo_cuenta` identifica de forma única una cuenta dentro de la instancia financiera. `tipo` clasifica la cuenta como Activo, Pasivo, Patrimonio, Ingreso o Egreso; `naturaleza` identifica su saldo normal (Debe o Haber). `id_cuenta_padre` permite construir jerarquías. Solo las cuentas activas que aceptan movimientos pueden usarse en detalles; las cuentas padre normalmente no aceptan imputaciones.
+Catálogo de cuentas de la empresa. `codigo_cuenta` identifica de forma única una cuenta dentro de la instancia financiera. `tipo` clasifica la cuenta como Activo, Pasivo, Patrimonio, Ingreso o Egreso; `naturaleza` identifica su saldo normal (Debe o Haber). `id_cuenta_padre` permite construir jerarquías. Solo las cuentas activas que aceptan movimientos pueden usarse en detalles; las cuentas padre normalmente no aceptan imputaciones. `es_efectivo` identifica explícitamente las cuentas que representan efectivo o bancos para el Flujo de Caja (FR-033); no se deduce del nombre, código ni tipo.
+
+### Designación de efectivo/bancos (FR-033)
+
+`Cuenta_Contable.es_efectivo` es la única fuente de designación de cuentas de efectivo/bancos. Es un booleano obligatorio con valor por defecto `false`; se establece desde el plan de cuentas y su cambio queda auditado. El Panel General (FR-001) y el reporte de Flujo de Caja (FR-032) deben filtrar por el mismo atributo `es_efectivo = true`, además de exigir asientos en estado `Contabilizada`, para evitar discrepancias entre ambas vistas (SC-013). Desactivar una cuenta no elimina ni reinicia el atributo. La designación aplicable es la vigente en el catálogo al momento de calcular; no se conserva una instantánea por asiento en esta versión, y todo cambio de `es_efectivo` queda auditado para trazabilidad.
+
 
 ### Transaccion
 
@@ -98,6 +104,7 @@ Antes de crear FKs físicas, se confirmarán los nombres, tipos, esquema y regla
 
 - `Cuenta_Contable.id_cuenta`, `Transaccion.id_transaccion` y `Detalle_Transaccion.id_detalle` son claves primarias generadas por la base de datos.
 - `Cuenta_Contable.codigo_cuenta` es obligatorio y único por empresa/instancia. Debe conservarse como texto para soportar códigos jerárquicos como `1.1.1`.
+- `Cuenta_Contable.es_efectivo` es obligatorio, booleano y por defecto `false`. Toda agregación de flujo de caja filtra por `es_efectivo = true`; no se permiten heurísticas por nombre, código o tipo de cuenta (FR-033).
 - `Transaccion.id_transaccion_revertida` es nulo para asientos normales; cuando se informa referencia al asiento original y es único, para impedir más de una reversa directa del mismo asiento. La reversa registra las mismas imputaciones con Debe y Haber intercambiados.
 - `Detalle_Transaccion` tiene una restricción única por (`id_transaccion`, `numero_linea`), `monto_debe >= 0`, `monto_haber >= 0` y exactamente uno de los dos importes mayor que cero.
 - Importes: `DECIMAL(19,4)` como precisión propuesta; la escala/moneda permitida se confirmará para el país y la operación. El MVP usa una moneda por asiento y no contempla conversión cambiaria automática.
@@ -118,7 +125,7 @@ Antes de crear FKs físicas, se confirmarán los nombres, tipos, esquema y regla
 
 - Ingresos y egresos contabilizados por período y cuenta.
 - Resultado neto del período a partir de las cuentas de Ingreso y Egreso.
-- Flujo de caja básico a partir de las cuentas de efectivo/bancos designadas en el plan de cuentas.
+- Flujo de caja básico a partir de las cuentas con `es_efectivo = true` y asientos `Contabilizada`, usando la misma designación en el panel y en el reporte.
 - Gastos por departamento/centro de costo y comparación con el presupuesto compartido disponible.
 - Historial de creación, aprobación, contabilización y reversa por usuario y fecha.
 
