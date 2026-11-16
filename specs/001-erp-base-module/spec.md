@@ -110,6 +110,96 @@ Como Analista Contable, quiero buscar asientos por rango de fechas, cuenta, cent
 
 ---
 
+### User Story 7 - Imputación y Control por Centros de Costo (Priority: P2)
+
+Como Gerente de Finanzas, quiero imputar las líneas de los asientos a los departamentos del catálogo ERP y visualizar el total de ingresos y gastos por cada área, para evaluar el desempeño financiero de cada departamento.
+
+**Why this priority**: Explota la integración con el catálogo organizacional del ERP anfitrión y habilita la vista de Centros de Costo.
+
+**Independent Test**: Un usuario contabiliza asientos asociados a distintos departamentos y verifica en la vista "Centros de costo" que los totales coinciden con lo imputado a cada área.
+
+**Acceptance Scenarios**:
+
+1. **Given** un conjunto de asientos en estado "Contabilizada" asignados a diferentes departamentos, **When** el usuario accede a la vista de Centros de Costo, **Then** se muestran los montos acumulados de ingresos, gastos y saldo neto agrupados por departamento.
+2. **Given** un departamento registrado en el catálogo ERP que aún no tiene movimientos contabilizados, **When** se consulta la vista, **Then** aparece listado con saldos en $0.00 sin generar errores.
+
+---
+
+### User Story 8 - Generación de Estado de Resultados y Flujo de Caja (Priority: P2)
+
+Como Gerente de Finanzas, quiero generar un reporte de Estado de Resultados y otro de Flujo de Caja filtrados por período contable, para analizar la rentabilidad y liquidez de la empresa de forma estructurada.
+
+**Why this priority**: Consolida la información de las cuentas activas en reportes financieros formales más allá de las tarjetas del panel general.
+
+**Independent Test**: Un usuario selecciona un rango de fechas en la vista "Reportes" y comprueba que el sistema desglosa las cuentas con movimiento y calcula la utilidad o pérdida neta exacta.
+
+**Acceptance Scenarios**:
+
+1. **Given** un período seleccionado con asientos en estado "Contabilizada", **When** el usuario consulta el Estado de Resultados, **Then** el sistema agrupa los saldos por cuenta de ingreso y gasto y calcula el resultado neto con precisión exacta de 4 decimales.
+2. **Given** que existen asientos en estado "Borrador" o "Pendiente" dentro del mismo período, **When** se generan los reportes, **Then** esos asientos son excluidos del cálculo hasta ser contabilizados.
+
+---
+
+### User Story 9 - Protección de Jerarquía e Integridad del Plan de Cuentas (Priority: P2)
+
+Como Analista Contable, quiero que el sistema impida eliminar cuentas que ya tienen movimientos asociados o crear relaciones padre-hijo circulares, ofreciendo la desactivación como alternativa segura, para preservar la consistencia histórica del catálogo.
+
+**Why this priority**: Evita referencias huérfanas en asientos antiguos y errores de recursión infinita en el árbol jerárquico.
+
+**Independent Test**: Un usuario intenta eliminar una cuenta con asientos registrados y el sistema bloquea el borrado permitiéndole únicamente desactivarla.
+
+**Acceptance Scenarios**:
+
+1. **Given** una cuenta contable que posee al menos una línea de asiento registrada, **When** el usuario intenta eliminarla, **Then** el sistema rechaza el borrado y sugiere cambiar su estado a inactiva.
+2. **Given** una cuenta padre A y una cuenta hija B, **When** el usuario intenta asignar a B como cuenta padre de A (ciclo) o a una cuenta consigo misma, **Then** el sistema bloquea la operación con un mensaje de validación.
+
+---
+
+### User Story 10 - Bitácora Cronológica de Eventos de Auditoría (Priority: P3)
+
+Como Auditor, quiero consultar un registro cronológico e inmutable de todas las acciones críticas realizadas en el módulo (creación, envío a revisión, aprobación, contabilización, reversas y cambios en cuentas), para verificar quién ejecutó cada operación y cuándo.
+
+**Why this priority**: Complementa la inmutabilidad de los asientos dando trazabilidad completa a nivel de sesión de usuario en la vista de Auditoría.
+
+**Independent Test**: Un usuario realiza el ciclo completo de un asiento (crear, aprobar, contabilizar y revertir) y verifica en la vista "Auditoría" que cada paso quedó registrado con su marca de tiempo y usuario.
+
+**Acceptance Scenarios**:
+
+1. **Given** que un usuario ejecuta una transición de estado sobre un asiento o modifica el plan de cuentas, **When** la operación persiste en el almacenamiento local, **Then** se registra automáticamente un evento en la bitácora con tipo de acción, fecha/hora, entidad afectada e identificador del usuario activo.
+2. **Given** el listado de eventos en la vista "Auditoría", **When** cualquier usuario inspecciona los registros, **Then** la interfaz los muestra en modo solo lectura sin controles de edición ni borrado.
+
+---
+
+### User Story 11 - Validación Estricta de Líneas e Importes Monetarios (Priority: P2)
+
+Como Analista Contable, quiero que el formulario de asientos valide en tiempo real que cada línea utilice una cuenta activa, tenga un importe positivo mayor a cero y respete el límite máximo de cuatro decimales, para prevenir errores de digitación antes de guardar.
+
+**Why this priority**: Asegura el cumplimiento de la aritmética de escala fija de 4 decimales y evita imputaciones a cuentas deshabilitadas.
+
+**Independent Test**: Un usuario intenta ingresar un monto negativo, un valor con cinco decimales o seleccionar una cuenta inactiva en el editor de líneas y recibe una alerta inmediata.
+
+**Acceptance Scenarios**:
+
+1. **Given** el editor de líneas de un asiento, **When** el usuario introduce un importe con más de 4 decimales (ej. "100.12345") o un valor menor o igual a cero, **Then** el sistema rechaza el valor con un mensaje claro sin redondearlo automáticamente.
+2. **Given** una cuenta contable marcada como inactiva, **When** el usuario despliega el selector de cuentas en una línea de asiento, **Then** la cuenta inactiva no está disponible para imputación.
+
+---
+
+### User Story 12 - Configuración del Período Contable y Respaldo de Estado Local (Priority: P3)
+
+Como Gerente de Finanzas, quiero configurar el período contable activo por defecto y verificar la integridad del almacenamiento local del módulo, para mantener el contexto de trabajo entre sesiones del navegador sin pérdida de datos.
+
+**Why this priority**: Da utilidad real a la vista de Configuración y asegura que el esquema versionado en `localStorage` sobreviva al cierre del navegador.
+
+**Independent Test**: Un usuario modifica las preferencias del período en la vista "Configuración", cierra la pestaña del navegador, vuelve a abrir el ERP y comprueba que tanto su configuración como los asientos registrados permanecen intactos.
+
+**Acceptance Scenarios**:
+
+1. **Given** la vista "Configuración", **When** el usuario define el período contable activo y guarda los cambios, **Then** las vistas de Panel General y Reportes toman ese período por defecto al cargarse.
+2. **Given** un estado financiero previamente guardado en el navegador, **When** el usuario cierra y reabre la aplicación, **Then** el sistema valida la versión del esquema y restaura todas las cuentas, asientos y eventos sin pérdida de precisión.
+
+---
+
 ### Edge Cases
 
 - Asiento con totales de Debe y Haber iguales pero sin líneas suficientes: debe rechazarse por no tener al menos dos líneas.
