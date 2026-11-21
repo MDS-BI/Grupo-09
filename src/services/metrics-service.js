@@ -1,5 +1,5 @@
 import { loadCollection } from '../storage.js'
-import { PRECISION } from '../src/utils/money.js'
+import { PRECISION } from '../utils/money.js'
 
 export function aggregatePostedEntries(from, to) {
   const entries = loadCollection('entries').records
@@ -36,7 +36,7 @@ export function aggregatePostedEntries(from, to) {
   }
 
   const resultadoNeto = ingresos - gastos
-  const flujoCaja = esEfectivo ? ingresos - gastos : 0
+  const flujoCaja = calculateCashFlow(from, to)
 
   return {
     ingresos: +ingresos.toFixed(PRECISION),
@@ -52,8 +52,6 @@ export function calculateCashFlow(from, to) {
   const postedEntries = entries.filter(
     (entry) => entry.estado === 'Contabilizada' && entry.fecha_contable >= from && entry.fecha_contable <= to
   )
-
-  const efectivoAccounts = accounts.filter((a) => a.es_efectivo === true)
 
   let totalCaja = 0
 

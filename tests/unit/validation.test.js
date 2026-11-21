@@ -113,9 +113,9 @@ describe('validation.js', () => {
       expect(result.message).toBe('El importe no puede tener más de 4 decimales')
     })
 
-    it('should return valid for an empty string (not required check)', () => {
+    it('should reject an empty string', () => {
       const result = amount('')
-      expect(result.valid).toBe(true)
+      expect(result.valid).toBe(false)
     })
   })
 })

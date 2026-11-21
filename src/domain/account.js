@@ -1,4 +1,4 @@
-import { loadCollection, saveCollection, addRecord, updateRecord, deleteRecord } from '../storage.js'
+import { loadCollection, saveCollection } from '../storage.js'
 
 export const ACCOUNT_STATE = {
   ACTIVA: 'Activa',
@@ -18,7 +18,7 @@ export function accountValidator(accounts) {
       errors.push('El código de cuenta debe ser numérico')
     }
 
-    if (accounts.some((a) => a.codigo === account.codigo && a.id !== account.id)) {
+    if (accounts.some((a) => a.codigo === account.codigo && (account.id === undefined || a.id !== account.id))) {
       errors.push('El código de cuenta ya existe')
     }
 
@@ -42,32 +42,32 @@ export function accountValidator(accounts) {
       account.es_efectivo = false
     }
 
-    if (!account.activa === undefined) {
+    if (account.activa === undefined) {
       account.activa = true
     }
 
-    return errors
+    return { valid: errors.length === 0, errors }
   }
 }
 
 export function addAccount(account) {
   const accounts = loadCollection('accounts').records
   const validator = accountValidator(accounts)
-  const errors = validator(account)
+  const validation = validator(account)
 
-  if (errors.length > 0) {
-    return { success: false, errors }
+  if (!validation.valid) {
+    return { success: false, errors: validation.errors }
   }
 
   const newAccount = {
-    id: `account-${Date.now()}`,
+    id: `account-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
     codigo: account.codigo,
     nombre: account.nombre,
     tipo: account.tipo,
     naturaleza: account.naturaleza,
     id_cuenta_padre: account.id_cuenta_padre,
     acepta_movimientos: account.acepta_movimientos,
-    es_efectivo: account.es_efectivo !== false,
+    es_efectivo: account.es_efectivo === true,
     activa: account.activa !== false,
     creado_por: 'user-1',
     creado_en: new Date().toISOString(),
@@ -86,10 +86,10 @@ export function updateAccount(id, updates) {
   }
 
   const validator = accountValidator(accounts)
-  const errors = validator({ ...accounts[index], ...updates, id })
+  const validation = validator({ ...accounts[index], ...updates, id })
 
-  if (errors.length > 0) {
-    return { success: false, errors }
+  if (!validation.valid) {
+    return { success: false, errors: validation.errors }
   }
 
   const updated = { ...accounts[index], ...updates, _timestamp: new Date().toISOString() }

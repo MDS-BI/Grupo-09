@@ -1,4 +1,3 @@
-import { aggregatePostedEntries } from './metrics-service.js'
 import { loadCollection } from '../storage.js'
 
 export function buildIncomeStatement({ from, to }) {
@@ -31,7 +30,7 @@ export function buildIncomeStatement({ from, to }) {
         }
       }
     }
-  )
+  }
 
   const resultadoNeto = +(ingresos - gastos).toFixed(4)
 
@@ -49,8 +48,6 @@ export function buildCashFlow({ from, to }) {
   const postedEntries = entries.filter(
     (entry) => entry.estado === 'Contabilizada' && entry.fecha_contable >= from && entry.fecha_contable <= to
   )
-
-  const efectivoAccounts = accounts.filter((a) => a.es_efectivo === true)
 
   let totalCaja = 0
 

@@ -1,5 +1,5 @@
 import { parseAmount } from '../utils/money.js'
-import { required, amount, currency, date as validateDate } from '../utils/validation.js'
+import { amount, date as validateDate } from '../utils/validation.js'
 
 export const ENTRY_STATE = {
   BORRADOR: 'Borrador',
@@ -14,7 +14,7 @@ export function validateEntryHeader(header) {
 
   if (!header.fecha_contable) {
     errors.push('La fecha contable es requerida')
-  } else if (!validateDate(header.fecha_contable)) {
+  } else if (!validateDate(header.fecha_contable).valid) {
     errors.push('La fecha contable debe tener formato YYYY-MM-DD')
   }
 
@@ -32,7 +32,7 @@ export function validateEntryHeader(header) {
 
   if (!header.moneda) {
     errors.push('La moneda es requerida')
-  } else if (!/^[A-Z]{3}$(header.moneda)) {
+  } else if (!/^[A-Z]{3}$/.test(header.moneda)) {
     errors.push('La moneda debe ser un código ISO 4217 de 3 letras')
   }
 
@@ -42,12 +42,18 @@ export function validateEntryHeader(header) {
 export function validateEntryLines(lines) {
   const errors = []
 
-  if (lines.length < 2) {
+  for (const line of lines) {
+    if (line.monto_debe > 0 && line.monto_haber > 0) {
+      errors.push(`Línea ${line.numero_linea}: No se permiten importes en ambos lados (Debe y Haber)`)
+    }
+  }
+
+  if (lines.length < 2 && errors.length === 0) {
     errors.push('Una transacción debe tener al menos 2 líneas')
   }
 
   let debeTotal = 0
-  lethaberTotal = 0
+  let haberTotal = 0
   let linesWithOnlyDebe = 0
   let linesWithOnlyHaber = 0
 
@@ -65,7 +71,7 @@ export function validateEntryLines(lines) {
       haberTotal += line.monto_haber
       linesWithOnlyHaber++
     } else if (line.monto_debe > 0 && line.monto_haber > 0) {
-      errors.push(`Línea ${line.numero_linea}: No se permiten importes en ambos lados (Debe y Haber)`)
+      continue
     } else {
       errors.push(`Línea ${line.numero_linea}: Importe inválido`)
     }
@@ -103,14 +109,17 @@ export function createEntryLine(idCuenta, idDepartamento, numeroLinea, montoDebe
   const amountCheckDebe = montoDebe > 0 ? parseAmount(montoDebe) : { valid: true }
   const amountCheckHaber = montoHaber > 0 ? parseAmount(montoHaber) : { valid: true }
 
-  if (!amountCheckDebe.valid || !amountCheckHaber.valid) {
+  if (
+    amountCheckDebe.error || amountCheckDebe.amount === null ||
+    amountCheckHaber.error || amountCheckHaber.amount === null
+  ) {
     throw new Error('Importe fuera del rango permitido (máximo 4 decimales)')
   }
 
   return {
     id: `det-${Date.now()}-${numeroLinea}`,
     id_transaccion: null,
-    id_cuenta,
+    id_cuenta: idCuenta,
     id_departamento: idDepartamento || null,
     numero_linea: numeroLinea,
     monto_debe: montoDebe > 0 ? montoDebe : 0,

@@ -1,6 +1,6 @@
 import { loadCollection, saveCollection } from '../storage.js'
-import { ENTRY_STATE, logEvent } from './audit-service.js'
-import { saveEntry } from './entry-service.js'
+import { ENTRY_STATE } from '../domain/entry.js'
+import { logEvent } from './audit-service.js'
 
 export function reverseEntry(entryId) {
   const entries = loadCollection('entries').records
@@ -53,7 +53,6 @@ export function reverseEntry(entryId) {
   }
 
   // Save both entries atomically
-  const entries = loadCollection('entries').records
   entries.push(reverseEntry)
 
   // Mark the original entry as reversed

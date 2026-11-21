@@ -1,5 +1,6 @@
 import { ENTRY_STATE } from '../domain/entry.js'
 import { logEvent } from './audit-service.js'
+import { saveEntry } from './entry-service.js'
 
 const ALLOWED_TRANSITIONS = {
   [ENTRY_STATE.BORRADOR]: [ENTRY_STATE.PENDIENTE],
@@ -49,7 +50,7 @@ export function approveEntry(entry, approverId) {
   return result
 }
 
-function approverRole(approverId) {
+function approverRole(_approverId) {
   // In a real app, this would look up the user's role
   // For now, default to 'contador'
   return 'contador'

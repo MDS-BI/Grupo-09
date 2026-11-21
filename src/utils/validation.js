@@ -63,8 +63,8 @@ export function date(value) {
 }
 
 export function amount(value) {
-  if (value === null || value === undefined || value === '') {
-    return { valid: true, message: null }
+  if (value === '' || value === null || value === undefined) {
+    return { valid: false, message: 'El importe no puede ser cero' }
   }
   const num = Number(value)
   if (isNaN(num)) {

@@ -1,10 +1,9 @@
-import { aggregatePostedEntries } from './metrics-service.js'
 import { loadCollection } from '../storage.js'
 
 export function computeDepartmentTotals({ from, to }) {
   const entries = loadCollection('entries').records
   const departments = loadCollection('@erp-department-base').records
-  const accounts = loadCollection('accounts').records
+  const accounts = new Map(loadCollection('accounts').records.map((account) => [account.id, account]))
 
   const postedEntries = entries.filter(
     (entry) => entry.estado === 'Contabilizada' && entry.fecha_contable >= from && entry.fecha_contable <= to
@@ -23,32 +22,19 @@ export function computeDepartmentTotals({ from, to }) {
 
   // Accumulate by department
   for (const entry of postedEntries) {
-    let deptId = null
-
     for (const line of entry.detalles) {
-      const account = accounts.find((a) => a.id === line.id_cuenta)
-      if (!account) continue
+      const account = accounts.get(line.id_cuenta)
 
       // Check if this line has a department
       if (line.id_departamento) {
-        deptId = line.id_departamento
-        // Determine if it's ingreso or gasto based on account type and side
-        const esEfectivo = account.es_efectivo === true
+        const deptId = line.id_departamento
+        if (!totals[deptId]) totals[deptId] = { ingresos: 0, gastos: 0, saldoNeto: 0 }
 
         if (line.monto_debe > 0 && line.monto_haber === 0) {
-          // Debe side
-          if (esEfectivo) {
-            totals[deptId].gastos += line.monto_debe
-          } else {
-            totals[deptId].gastos += line.monto_debe
-          }
+          totals[deptId].gastos += line.monto_debe
+          if (!account) totals[deptId].ingresos += line.monto_debe
         } else if (line.monto_haber > 0 && line.monto_debe === 0) {
-          // Haber side
-          if (esEfectivo) {
-            totals[deptId].ingresos += line.monto_haber
-          } else {
-            totals[deptId].ingresos += line.monto_haber
-          }
+          totals[deptId].ingresos += line.monto_haber
         }
       } else {
         // Line without department goes to "Sin departamento"

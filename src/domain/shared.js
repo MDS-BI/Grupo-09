@@ -1,4 +1,4 @@
-import { loadCollection, saveCollection } from '../storage.js'
+import { loadCollection, addRecord } from '../storage.js'
 
 const USER_BASE_KEY = '@erp-user-base'
 const DEPARTMENT_BASE_KEY = '@erp-department-base'
@@ -33,21 +33,29 @@ export function addDepartment(dept) {
 
 export function canDeleteUser(userId) {
   const users = loadUsers()
-  return users.length === 0 || { allowed: false, reason: 'No se pueden eliminar usuarios referenciados' }
+  const target = users.find(u => u.id === userId || u._id === userId)
+  if (users.length <= 1 || !target) {
+    return { allowed: false, reason: 'No se pueden eliminar usuarios referenciados' }
+  }
+  return { allowed: true, reason: null }
 }
 
 export function canDeleteDepartment(deptId) {
   const departments = loadDepartments()
-  const referenced = DEPARTMENTS.default.filter(d => d._id !== deptId && d.id_departamento === deptId)
-  return referenced.length === 0 || { allowed: false, reason: 'No se pueden eliminar departamentos referenciados' }
+  const target = departments.find(d => d.id === deptId || d._id === deptId)
+  const referenced = departments.some(d => d._id !== target?._id && d.id_departamento === deptId)
+  if (departments.length <= 1 || !target || referenced) {
+    return { allowed: false, reason: 'No se pueden eliminar departamentos referenciados' }
+  }
+  return { allowed: true, reason: null }
 }
 
 export function getUser(id) {
   const users = loadUsers()
-  return users.find(u => u._id === id) || null
+  return users.find(u => u.id === id || u._id === id) || null
 }
 
 export function getDepartment(id) {
   const departments = loadDepartments()
-  return departments.find(d => d._id === id) || null
+  return departments.find(d => d.id === id || d._id === id) || null
 }

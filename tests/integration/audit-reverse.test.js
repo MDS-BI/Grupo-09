@@ -53,9 +53,9 @@ describe('US4: Auditoría y reversas', () => {
     const reverseResult = reverseEntry(addResult.entry.id)
     expect(reverseResult.success).toBe(true)
 
-    const reverseEntry = reverseResult.reverseEntry
-    expect(reverseEntry.estado).toBe('Revertida')
-    expect(reverseEntry.id_transaccion_revertida).toBe(addResult.entry.id)
+    const reversal = reverseResult.reverseEntry
+    expect(reversal.estado).toBe('Revertida')
+    expect(reversal.id_transaccion_revertida).toBe(addResult.entry.id)
 
     // Verify original entry state changed
   })

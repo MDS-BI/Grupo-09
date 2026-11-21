@@ -1,6 +1,43 @@
 const SCHEMA_VERSION = '1.0'
 
 const ENVELOPE_KEY = '@erp-envelope'
+const AUDIT_COLLECTION = 'audit-log'
+const AUDIT_STREAM_KEY = '@erp-audit-log'
+
+function parseAuditStream() {
+  const stream = getAuditStream()
+  if (!stream) return []
+  return stream
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line) => {
+      try {
+        return JSON.parse(line)
+      } catch {
+        return null
+      }
+    })
+    .filter(Boolean)
+}
+
+function getAuditStream() {
+  if (!localStorage.getItem(`${ENVELOPE_KEY}:${AUDIT_COLLECTION}`)) return ''
+  return localStorage.getItem(AUDIT_STREAM_KEY) || ''
+}
+
+function appendAuditRecord(record) {
+  const envelopeKey = `${ENVELOPE_KEY}:${AUDIT_COLLECTION}`
+  const isFresh = !localStorage.getItem(envelopeKey)
+  if (isFresh) {
+    localStorage.setItem(envelopeKey, JSON.stringify({ schemaVersion: SCHEMA_VERSION, records: [] }))
+    localStorage.removeItem(AUDIT_STREAM_KEY)
+  }
+  const stream = localStorage.getItem(AUDIT_STREAM_KEY) || ''
+  const line = JSON.stringify(record)
+  localStorage.setItem(AUDIT_STREAM_KEY, stream ? `${stream}\n${line}` : line)
+  return record
+}
 
 function generateId() {
   return 'id_' + Math.random().toString(36).substr(2, 9)
@@ -11,6 +48,10 @@ function getTimestamp() {
 }
 
 function loadCollection(name) {
+  if (name === AUDIT_COLLECTION) {
+    return { records: parseAuditStream(), schemaVersion: SCHEMA_VERSION }
+  }
+
   const envelopeString = localStorage.getItem(`${ENVELOPE_KEY}:${name}`)
   if (!envelopeString) {
     return { records: [], schemaVersion: SCHEMA_VERSION }
@@ -63,7 +104,7 @@ function migrateLegacyCollection(name, envelope) {
   return { records: migratedRecords, schemaVersion: SCHEMA_VERSION }
 }
 
-function migrateCollection(name, records, oldVersion) {
+function migrateCollection(name, records, _oldVersion) {
   // Migrate based on old version to current
   const migratedRecords = records.map(record => {
     // Migrate es_efectivo for legacy accounts
@@ -73,8 +114,8 @@ function migrateCollection(name, records, oldVersion) {
     return {
       ...record,
       schemaVersion: SCHEMA_VERSION,
-    })
-  })
+    };
+  });
   
   // Save migrated data
   saveCollection(name, migratedRecords)
@@ -82,6 +123,23 @@ function migrateCollection(name, records, oldVersion) {
 }
 
 function saveCollection(name, records) {
+  if (name === AUDIT_COLLECTION) {
+    const normalized = records.map((record) => ({
+      ...record,
+      _id: record._id || generateId(),
+      _timestamp: record._timestamp || getTimestamp(),
+    }))
+    localStorage.setItem(
+      AUDIT_STREAM_KEY,
+      normalized.map((record) => JSON.stringify(record)).join('\n')
+    )
+    localStorage.setItem(
+      `${ENVELOPE_KEY}:${AUDIT_COLLECTION}`,
+      JSON.stringify({ schemaVersion: SCHEMA_VERSION, records: normalized })
+    )
+    return
+  }
+
   const envelope = {
     schemaVersion: SCHEMA_VERSION,
     records: records.map(record => ({
@@ -124,4 +182,6 @@ function deleteRecord(name, id) {
   return true
 }
 
-export { loadCollection, saveCollection, addRecord, updateRecord, deleteRecord, ensureSchemaVersion, SCHEMA_VERSION }
+globalThis.loadCollection = loadCollection
+
+export { loadCollection, saveCollection, addRecord, updateRecord, deleteRecord, appendAuditRecord, ensureSchemaVersion, SCHEMA_VERSION }

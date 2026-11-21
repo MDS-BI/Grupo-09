@@ -2,7 +2,7 @@ export const PRECISION = 4
 
 export function parseAmount(value) {
   if (value === null || value === undefined || value === '') {
-    return { amount: 0, error: 'INVALID_AMOUNT' }
+    return { amount: null, error: 'INVALID_AMOUNT' }
   }
   const stringValue = String(value)
   const parts = stringValue.split('.')
@@ -17,7 +17,7 @@ export function parseAmount(value) {
   const total = integerPart + decimalPart
   const amount = parseInt(total, 10) / Math.pow(10, PRECISION)
   if (isNaN(amount)) {
-    return { amount: 0, error: 'INVALID_AMOUNT' }
+    return { amount: null, error: 'INVALID_AMOUNT' }
   }
   return { amount }
 }

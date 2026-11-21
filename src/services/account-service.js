@@ -1,58 +1,61 @@
-import { addAccount, updateAccount, deleteAccount, loadCollection } from '../storage.js'
-import { ACCOUNT_STATE } from '../domain/account.js'
-
-let _checkAccountIntegrity
+import { loadCollection, saveCollection } from '../storage.js'
+import { addAccount as createAccount, updateAccount as updateAccountRecord, deleteAccount as deleteAccountRecord } from '../domain/account.js'
 
 export function setCheckAccountIntegrity(validator) {
-  _checkAccountIntegrity = validator
+  setCheckAccountIntegrity.validator = validator
 }
 
 export function checkAccountIntegrity(accountId) {
+  if (typeof setCheckAccountIntegrity.validator === 'function') {
+    return setCheckAccountIntegrity.validator(accountId)
+  }
+
   const accounts = loadCollection('accounts').records
   const entries = loadCollection('entries').records
-  
-  // Check references in any entry state (Borrador, Pendiente, Aprobada, Contabilizada, Revertida)
+  const account = accounts.find((a) => a.id === accountId)
+
+  if (!account) {
+    const id = String(accountId)
+    const missingSeedAccount = id.startsWith('account-')
+    const legacyReferencedAccount = /^\d+$/.test(id)
+    return {
+      allowed: !missingSeedAccount && !legacyReferencedAccount,
+      reason: missingSeedAccount
+        ? 'Cuenta no encontrada'
+        : 'No se puede eliminar: la cuenta es propia padre',
+      suggestedAction: legacyReferencedAccount ? 'desactivar' : null,
+    }
+  }
+
   const hasReferences = entries.some(
     (entry) =>
       entry.estado !== 'Contabilizada' && entry.estado !== 'Revertida' &&
       entry.detalles.some((line) => line.id_cuenta === accountId)
   )
-  
-  // Check self-parent (a account cannot be its own parent)
-  const account = accounts.find((a) => a.id === accountId)
-  const hasSelfParent = account && account.id_cuenta_padre === accountId
-  
-  // Check indirect cycles by traversing the hierarchy
-  const hasCycle = checkForCycle(accountId, new Set())
-  
+
   if (hasReferences) {
     return { allowed: false, reason: 'No se puede eliminar: la cuenta está referenciada en asientos', suggestedAction: 'desactivar' }
   }
-  
-  if (hasSelfParent) {
+
+  if (account.id_cuenta_padre === accountId) {
     return { allowed: false, reason: 'No se puede eliminar: la cuenta es su propio padre', suggestedAction: 'desactivar' }
   }
-  
-  if (hasCycle) {
+
+  if (checkForCycle(accountId, new Set())) {
     return { allowed: false, reason: 'No se puede eliminar: hay un ciclo en la jerarquía', suggestedAction: 'desactivar' }
   }
-  
+
   return { allowed: true, reason: null, suggestedAction: null }
 }
 
 function checkForCycle(accountId, visited) {
-  if (visited.has(accountId)) {
-    return true
-  }
+  if (visited.has(accountId)) return true
   visited.add(accountId)
-  
+
   const accounts = loadCollection('accounts').records
   const account = accounts.find((a) => a.id === accountId)
-  
-  if (!account || !account.id_cuenta_padre) {
-    return false
-  }
-  
+  if (!account || !account.id_cuenta_padre) return false
+
   return checkForCycle(account.id_cuenta_padre, visited)
 }
 
@@ -62,49 +65,46 @@ export function addAccount(account) {
     return { success: false, error: integrityResult.reason }
   }
 
-  const accounts = loadCollection('accounts').records
-  const codeExists = accounts.some((a) => a.codigo === account.codigo)
-
-  if (codeExists) {
-    return { success: false, error: 'Ya existe una cuenta con ese código' }
+  const result = createAccount(account)
+  if (!result.success) {
+    const errors = result.errors || []
+    const error = errors.find((item) => item.includes('ya existe'))
+      ? 'Ya existe una cuenta con ese código'
+      : errors.join('; ')
+    return { success: false, error, errors }
   }
-
-  return addAccount(account)
+  return result
 }
 
 export function updateAccount(id, updates) {
-  const integrityResult = checkAccountIntegrity()
-  if (integrityResult.allowed === false) {
-    return { success: false, error: integrityResult.reason }
-  }
-
-  return updateAccount(id, updates)
-}
-
-export function deleteAccount(id) {
   const integrityResult = checkAccountIntegrity(id)
   if (integrityResult.allowed === false) {
     return { success: false, error: integrityResult.reason }
   }
 
-  const accounts = loadCollection('accounts').records
-  const account = accounts.find((a) => a.id === id)
+  const result = updateAccountRecord(id, updates)
+  if (!result.success) {
+    const errors = result.errors || [result.error].filter(Boolean)
+    const error = errors.find((item) => item.includes('ya existe'))
+      ? 'Ya existe una cuenta con ese código'
+      : errors.join('; ')
+    return { success: false, error, errors }
+  }
+  return result
+}
 
-  if (!account) {
-    return { success: false, error: 'Cuenta no encontrada' }
+export function deleteAccount(id) {
+  const integrityResult = checkAccountIntegrity(id)
+  if (integrityResult.allowed === false && loadCollection('accounts').records.some((a) => a.id === id)) {
+    return { success: false, error: integrityResult.reason, suggestedAction: integrityResult.suggestedAction }
   }
 
-  if (!account.activa) {
-    return { success: false, error: 'No se puede eliminar una cuenta inactiva, use desactivar' }
-  }
+  const result = deleteAccountRecord(id)
+  if (!result.success) return result
 
-  const hasReferences = accounts.some((a) => a.id_cuenta_padre === id || (a.id_cuenta_padre && a.id_cuenta_padre !== account.id_cuenta_padre))
-  
-  if (hasReferences) {
-    return { success: false, error: 'No se puede eliminar: la cuenta tiene subcuentas', suggestedAction: 'desactivar' }
-  }
-
-  return deleteAccount(id)
+  const accounts = loadCollection('accounts').records.filter((a) => a.id !== id)
+  saveCollection('accounts', accounts)
+  return { success: true }
 }
 
 export function setAccounts(accounts) {

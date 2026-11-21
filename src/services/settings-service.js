@@ -1,5 +1,3 @@
-import { loadCollection, saveCollection } from '../storage.js'
-
 const STORAGE_KEY = '@erp-settings'
 const SCHEMA_VERSION = '1.0'
 
@@ -70,9 +68,6 @@ function validateSettings(settings) {
 }
 
 export function setActivePeriod(from, to, preset = 'month') {
-  const current = loadSettings() || {}
-  const activePeriod = current.activePeriod || { from: '', to: '', preset: 'month' }
-  
   // Don't accept inverted ranges
   if (from && to) {
     const fromDate = new Date(`2026-${from}`)
