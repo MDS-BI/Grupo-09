@@ -1,12 +1,427 @@
-import { renderPlaceholderView } from './placeholder.js';
+import { loadCollection } from '../storage.js';
+import { ENTRY_STATE } from '../domain/entry.js';
+import {
+  filterEntries,
+  getDistinctAccounts,
+  getDistinctDepartments,
+} from '../services/query-service.js';
 
 export const viewInfo = {
   title: 'Consulta',
   breadcrumb: 'Consulta',
-  description: 'Busca asientos y cuentas con filtros combinados.',
+  description: 'Busca asientos y movimientos con filtros combinados.',
   action: 'Nueva búsqueda',
 };
 
+const FILTER_KEYS = [
+  'busqueda_texto',
+  'fecha_desde',
+  'fecha_hasta',
+  'id_cuenta',
+  'id_departamento',
+  'estado',
+];
+
+const filters = Object.fromEntries(FILTER_KEYS.map((key) => [key, '']));
+
 export function render() {
-  return renderPlaceholderView(viewInfo);
+  ensureListeners();
+  FILTER_KEYS.forEach((key) => {
+    filters[key] = '';
+  });
+
+  const catalog = buildCatalog();
+  const results = runQuery(catalog);
+
+  return `
+    <section class="consulta-view" id="consulta-view">
+      <div class="page-heading">
+        <div>
+          <div class="eyebrow"><span class="eyebrow-line"></span> CONSULTA HISTÓRICA</div>
+          <h1>Consulta histórica</h1>
+          <p class="subtitle">Busca asientos y sus movimientos por fecha, cuenta, centro de costo y estado.</p>
+        </div>
+        <div class="heading-actions">
+          <button class="button button-secondary" type="button" id="reset-filters" data-action="reset-filters">
+            Restablecer filtros
+          </button>
+        </div>
+      </div>
+
+      <section class="panel query-filters" id="query-filters" aria-label="Filtros de consulta">
+        <div class="panel-heading">
+          <div>
+            <h2>Filtros de búsqueda</h2>
+            <p>Combina varios criterios para obtener solo los asientos que cumplen todos.</p>
+          </div>
+        </div>
+        <div class="query-filter-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px">
+          <label class="query-field">
+            <span>Buscar</span>
+            <input id="query-search" name="busqueda_texto" data-filter="busqueda_texto" type="search"
+              placeholder="Descripción, documento, cuenta o glosa" value="${escapeHtml(filters.busqueda_texto)}" />
+          </label>
+          <label class="query-field">
+            <span>Desde</span>
+            <input id="query-desde" name="fecha_desde" data-filter="fecha_desde" type="date"
+              value="${escapeHtml(filters.fecha_desde)}" />
+          </label>
+          <label class="query-field">
+            <span>Hasta</span>
+            <input id="query-hasta" name="fecha_hasta" data-filter="fecha_hasta" type="date"
+              value="${escapeHtml(filters.fecha_hasta)}" />
+          </label>
+          <label class="query-field">
+            <span>Cuenta contable</span>
+            <select id="query-cuenta" name="id_cuenta" data-filter="id_cuenta">
+              ${renderOptions(catalog.accounts, filters.id_cuenta, 'Todas las cuentas')}
+            </select>
+          </label>
+          <label class="query-field">
+            <span>Centro de costo</span>
+            <select id="query-centro" name="id_departamento" data-filter="id_departamento">
+              ${renderOptions(catalog.departments, filters.id_departamento, 'Todos los centros de costo')}
+            </select>
+          </label>
+          <label class="query-field">
+            <span>Estado del asiento</span>
+            <select id="query-estado" name="estado" data-filter="estado">
+              <option value="">Todos los estados</option>
+              ${Object.values(ENTRY_STATE)
+                .map(
+                  (state) =>
+                    `<option value="${escapeHtml(state)}"${filters.estado === state ? ' selected' : ''}>${escapeHtml(state)}</option>`,
+                )
+                .join('')}
+            </select>
+          </label>
+        </div>
+      </section>
+
+      <div id="query-results">${renderResults(results, catalog)}</div>
+    </section>
+  `;
+}
+
+export function refreshConsultaView() {
+  if (typeof document === 'undefined') return;
+  updateResults();
+}
+
+export function renderConsulta() {
+  return render();
+}
+
+export default render;
+
+function ensureListeners() {
+  if (typeof document === 'undefined' || document.__consultaListenersBound) return;
+  document.__consultaListenersBound = true;
+
+  document.addEventListener('input', (event) => {
+    if (!isFilterControl(event.target)) return;
+    filters[event.target.dataset.filter] = event.target.value.trim();
+    updateResults();
+  });
+
+  document.addEventListener('change', (event) => {
+    if (!isFilterControl(event.target)) return;
+    filters[event.target.dataset.filter] = event.target.value.trim();
+    updateResults();
+  });
+
+  document.addEventListener('click', (event) => {
+    const action = event.target.closest?.('#consulta-view [data-action]')?.dataset.action;
+    if (action === 'clear-filters' || action === 'reset-filters') clearFilters();
+  });
+
+  window.addEventListener('storage', (event) => {
+    if (!event.key || event.key.startsWith('@erp-envelope:')) updateResults();
+  });
+}
+
+function isFilterControl(element) {
+  return Boolean(element?.closest?.('#consulta-view [data-filter]'));
+}
+
+function clearFilters() {
+  FILTER_KEYS.forEach((key) => {
+    filters[key] = '';
+  });
+  const root = document.querySelector('#consulta-view');
+  root?.querySelectorAll('[data-filter]').forEach((control) => {
+    control.value = '';
+  });
+  updateResults();
+}
+
+function updateResults() {
+  const container = document.querySelector('#consulta-view #query-results');
+  if (!container) return;
+  const catalog = buildCatalog();
+  container.innerHTML = renderResults(runQuery(catalog), catalog);
+}
+
+function runQuery(catalog) {
+  let results;
+  try {
+    results = filterEntries({ ...filters });
+  } catch {
+    results = loadCollection('entries').records;
+    results = results.filter((entry) => matchesFiltersLocally(entry));
+  }
+
+  if (filters.busqueda_texto) {
+    results = results.filter((entry) => matchesMovementText(entry, filters.busqueda_texto, catalog));
+  }
+
+  return results.slice().sort((left, right) =>
+    String(right.fecha_contable || '').localeCompare(String(left.fecha_contable || '')),
+  );
+}
+
+function matchesFiltersLocally(entry) {
+  const lines = entry.detalles || [];
+  if (filters.fecha_desde && String(entry.fecha_contable || '') < filters.fecha_desde) return false;
+  if (filters.fecha_hasta && String(entry.fecha_contable || '') > filters.fecha_hasta) return false;
+  if (filters.estado && entry.estado !== filters.estado) return false;
+  if (filters.id_cuenta && !lines.some((line) => line.id_cuenta === filters.id_cuenta)) return false;
+  if (filters.id_departamento && !lines.some((line) => line.id_departamento === filters.id_departamento)) {
+    return false;
+  }
+  if (filters.busqueda_texto) {
+    const haystack = [entry.descripcion, entry.numero_documento, entry.tipo_documento]
+      .filter(Boolean)
+      .join(' ')
+      .toLocaleLowerCase('es');
+    if (!haystack.includes(filters.busqueda_texto.toLocaleLowerCase('es'))) return false;
+  }
+  return true;
+}
+
+function matchesMovementText(entry, query, catalog) {
+  const text = [
+    entry.id,
+    entry.descripcion,
+    entry.numero_documento,
+    entry.tipo_documento,
+    ...(entry.detalles || []).flatMap((line) => [
+      line.glosa,
+      line.id_cuenta,
+      line.id_departamento,
+      catalog.accountLabel(line.id_cuenta),
+      catalog.departmentLabel(line.id_departamento),
+    ]),
+  ]
+    .filter(Boolean)
+    .join(' ')
+    .toLocaleLowerCase('es');
+  return text.includes(query.toLocaleLowerCase('es'));
+}
+
+function renderResults(results, catalog) {
+  const totals = sumTotals(results);
+  const hasResults = results.length > 0;
+
+  return `
+    <div class="query-summary" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; margin: 14px 0">
+      <div class="panel" style="padding: 14px">
+        <span class="eyebrow">RESULTADOS</span>
+        <strong id="query-count" style="display: block; margin-top: 6px; font: 700 22px Manrope, sans-serif">${results.length}</strong>
+        <span style="font-size: 10px; color: #8792a2">asientos encontrados</span>
+      </div>
+      <div class="panel" style="padding: 14px">
+        <span class="eyebrow">TOTAL DEBE</span>
+        <strong id="query-total-debe" style="display: block; margin-top: 6px; font: 700 22px Manrope, sans-serif">${escapeHtml(formatCurrency(totals.debe))}</strong>
+        <span style="font-size: 10px; color: #8792a2">suma de movimientos</span>
+      </div>
+      <div class="panel" style="padding: 14px">
+        <span class="eyebrow">TOTAL HABER</span>
+        <strong id="query-total-haber" style="display: block; margin-top: 6px; font: 700 22px Manrope, sans-serif">${escapeHtml(formatCurrency(totals.haber))}</strong>
+        <span style="font-size: 10px; color: #8792a2">suma de movimientos</span>
+      </div>
+    </div>
+
+    <section class="panel transactions-panel">
+      <div class="panel-heading">
+        <div>
+          <h2>Resultados de la consulta</h2>
+          <p>Asientos y movimientos registrados en el almacenamiento local</p>
+        </div>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>FECHA</th>
+              <th>ASIENTO</th>
+              <th>MOVIMIENTOS</th>
+              <th class="amount-col">DEBE</th>
+              <th class="amount-col">HABER</th>
+              <th>ESTADO</th>
+            </tr>
+          </thead>
+          <tbody id="query-results-body">
+            ${results.map((entry) => renderEntryRow(entry, catalog)).join('')}
+          </tbody>
+          <tfoot${hasResults ? '' : ' hidden'}>
+            <tr>
+              <th colspan="3">Totales de la consulta</th>
+              <th class="amount-col">${escapeHtml(formatCurrency(totals.debe))}</th>
+              <th class="amount-col">${escapeHtml(formatCurrency(totals.haber))}</th>
+              <th></th>
+            </tr>
+          </tfoot>
+        </table>
+        <div class="empty-state" id="query-empty-state" role="status"${hasResults ? ' hidden' : ''} style="padding: 26px; text-align: center">
+          <p style="font-weight: 700; color: #344054; margin: 0 0 6px">No se encontraron registros con los filtros aplicados.</p>
+          <p style="font-size: 11px; color: #8792a2; margin: 0 0 14px">Prueba con otro rango de fechas, cuenta, centro de costo o estado.</p>
+          <button class="button button-primary" type="button" id="clear-filters" data-action="clear-filters">Limpiar filtros</button>
+        </div>
+      </div>
+      <div class="table-footer">
+        <span>Mostrando <strong>${results.length}</strong> asientos</span>
+        <span class="period-label">${hasResults ? 'Totales calculados sobre los movimientos de los asientos mostrados' : 'Sin resultados para mostrar'}</span>
+      </div>
+    </section>
+  `;
+}
+
+function renderEntryRow(entry, catalog) {
+  const lines = entry.detalles || [];
+  const debe = sumLines(lines, 'monto_debe');
+  const haber = sumLines(lines, 'monto_haber');
+  const movements = lines.length
+    ? lines
+        .map(
+          (line) =>
+            `${catalog.accountLabel(line.id_cuenta)} · ${catalog.departmentLabel(line.id_departamento)}${
+              line.glosa ? ` · ${line.glosa}` : ''
+            }`,
+        )
+        .join(' | ')
+    : 'Sin movimientos registrados';
+
+  return `
+    <tr data-entry-id="${escapeHtml(entry.id || '')}" data-estado="${escapeHtml(entry.estado || '')}">
+      <td>${escapeHtml(formatDate(entry.fecha_contable))}</td>
+      <td>
+        <span class="transaction-main">
+          <strong>${escapeHtml(entry.descripcion || 'Asiento contable')}</strong>
+          <small>${escapeHtml([entry.tipo_documento, entry.numero_documento].filter(Boolean).join(' · ') || entry.id || '')}</small>
+        </span>
+      </td>
+      <td style="white-space: normal">${escapeHtml(movements)}</td>
+      <td class="amount-col">${escapeHtml(formatCurrency(debe))}</td>
+      <td class="amount-col">${escapeHtml(formatCurrency(haber))}</td>
+      <td>${renderStatePill(entry.estado)}</td>
+    </tr>
+  `;
+}
+
+function renderStatePill(state) {
+  const value = Object.values(ENTRY_STATE).includes(state) ? state : ENTRY_STATE.BORRADOR;
+  const approved = value === ENTRY_STATE.CONTABILIZADA || value === ENTRY_STATE.APROBADA;
+  return `<span class="status-pill ${approved ? 'status-approved' : 'status-pending'}"><i></i>${escapeHtml(value)}</span>`;
+}
+
+function sumTotals(entries) {
+  return entries.reduce(
+    (totals, entry) => {
+      totals.debe += sumLines(entry.detalles || [], 'monto_debe');
+      totals.haber += sumLines(entry.detalles || [], 'monto_haber');
+      return totals;
+    },
+    { debe: 0, haber: 0 },
+  );
+}
+
+function sumLines(lines, field) {
+  return lines.reduce((sum, line) => sum + (Number(line[field]) || 0), 0);
+}
+
+function buildCatalog() {
+  const accountItems = [
+    ...loadCollection('accounts').records,
+    ...loadCollection('cuentas-contables').records,
+    ...getDistinctAccounts().map((id) => ({ id, codigo: id })),
+  ];
+  const accountById = indexRecords(accountItems);
+  const accountLabel = (id) => {
+    if (!id) return 'Sin cuenta';
+    const item = accountById.get(id);
+    return item ? labelFor(item) : id;
+  };
+
+  const departmentItems = [
+    ...loadCollection('@erp-department-base').records,
+    ...loadCollection('centros-costo').records,
+    ...getDistinctDepartments().map((id) => ({ id, nombre: id })),
+  ];
+  const departmentById = indexRecords(departmentItems);
+  const departmentLabel = (id) => {
+    if (!id) return 'Sin departamento';
+    const item = departmentById.get(id);
+    return item ? item.nombre || item.codigo || item.id : id;
+  };
+
+  return {
+    accounts: [...accountById.values()].map((item) => ({ id: item.id, label: labelFor(item) })),
+    departments: [...departmentById.values()].map((item) => ({
+      id: item.id,
+      label: [item.codigo, item.nombre].filter(Boolean).join(' · ') || item.id,
+    })),
+    accountLabel,
+    departmentLabel,
+  };
+}
+
+function indexRecords(records) {
+  const byId = new Map();
+  records.filter(Boolean).forEach((item) => {
+    const id = item.id || item._id;
+    if (!id || byId.has(id)) return;
+    byId.set(id, { ...item, id });
+  });
+  return byId;
+}
+
+function labelFor(item) {
+  return [item.codigo, item.nombre].filter(Boolean).join(' · ') || item.id;
+}
+
+function renderOptions(items, selected, placeholder) {
+  return `
+    <option value="">${escapeHtml(placeholder)}</option>
+    ${items
+      .map(
+        (item) =>
+          `<option value="${escapeHtml(item.id)}"${selected === item.id ? ' selected' : ''}>${escapeHtml(item.label || item.id)}</option>`,
+      )
+      .join('')}
+  `;
+}
+
+function formatCurrency(value) {
+  const amount = Number(value) || 0;
+  const fixed = Math.abs(amount).toFixed(4).replace(/0+$/, '').replace(/\.$/, '');
+  const [integer, decimals] = fixed.split('.');
+  return `${amount < 0 ? '-' : ''}$${integer}.${(decimals || '').padEnd(2, '0')}`;
+}
+
+function formatDate(value) {
+  const date = new Date(`${String(value || '').slice(0, 10)}T00:00:00`);
+  if (Number.isNaN(date.getTime())) return '—';
+  return new Intl.DateTimeFormat('es', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+  }).format(date);
+}
+
+function escapeHtml(value) {
+  return String(value ?? '').replace(
+    /[&<>"']/g,
+    (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[character],
+  );
 }
