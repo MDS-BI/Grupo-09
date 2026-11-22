@@ -334,11 +334,22 @@ function accountKind(account) {
 function buildRows(catalog, totals) {
   const rows = [];
   const used = new Set();
+  const consolidated = { ingresos: 0, gastos: 0 };
+
+  const absorb = (value) => {
+    if (!value) return;
+    consolidated.ingresos += round4(Number(value.ingresos) || 0);
+    consolidated.gastos += round4(Number(value.gastos) || 0);
+  };
 
   catalog.forEach((department) => {
     const id = department.id || department._id;
-    if (!id || id === SIN_DEPARTAMENTO || used.has(id)) return;
+    if (!id || used.has(id)) return;
     used.add(id);
+    if (isSinDepartamento(department)) {
+      absorb(totals[id]);
+      return;
+    }
     rows.push(makeRow(id, department.codigo, department.nombre, totals[id]));
   });
 
@@ -348,13 +359,29 @@ function buildRows(catalog, totals) {
     rows.push(makeRow(key, '', key, value));
   });
 
-  if (!used.has(SIN_DEPARTAMENTO)) {
-    rows.push(
-      makeRow(SIN_DEPARTAMENTO, 'S/D', SIN_DEPARTAMENTO, totals[SIN_DEPARTAMENTO], 'Líneas sin centro de costo'),
-    );
-  }
+  absorb(totals[SIN_DEPARTAMENTO]);
+  rows.push(
+    makeRow(
+      SIN_DEPARTAMENTO,
+      'SIN',
+      SIN_DEPARTAMENTO,
+      { ingresos: consolidated.ingresos, gastos: consolidated.gastos },
+      'Dept. SIN y líneas sin centro de costo',
+    ),
+  );
 
   return rows;
+}
+
+function isSinDepartamento(department) {
+  const id = department.id || department._id;
+  const codigo = String(department.codigo || '')
+    .trim()
+    .toUpperCase();
+  const nombre = String(department.nombre || '')
+    .trim()
+    .toLowerCase();
+  return id === SIN_DEPARTAMENTO || codigo === 'SIN' || nombre === SIN_DEPARTAMENTO.toLowerCase();
 }
 
 function makeRow(id, codigo, nombre, totals, nota) {
