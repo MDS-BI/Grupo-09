@@ -1,5 +1,5 @@
-import { loadSettings, setActivePeriod } from '../services/settings-service.js';
 import { loadCollection, SCHEMA_VERSION } from '../storage.js';
+import { loadActivePeriod, loadConfiguredPeriod, saveActivePeriod } from '../services/settings-service.js';
 
 export const viewInfo = {
   title: 'Configuración',
@@ -13,11 +13,10 @@ let listenersBound = false;
 export function render() {
   ensureListeners();
 
-  const settings = loadSettings();
-  const activePeriod = settings?.activePeriod || {};
-  const preset = normalizePreset(activePeriod.preset);
-  const from = isValidDate(activePeriod.from) ? activePeriod.from : '';
-  const to = isValidDate(activePeriod.to) ? activePeriod.to : '';
+  const activePeriod = loadConfiguredPeriod() || loadActivePeriod() || {};
+  const preset = normalizePreset(activePeriod.modo);
+  const from = isValidDate(activePeriod.desde) ? activePeriod.desde : '';
+  const to = isValidDate(activePeriod.hasta) ? activePeriod.hasta : '';
   const warning = getSchemaWarning();
 
   return `
@@ -154,6 +153,15 @@ function ensureListeners() {
   if (listenersBound || typeof document === 'undefined') return;
   listenersBound = true;
   document.addEventListener('click', handleSettingsClick);
+  document.addEventListener('input', handleSettingsInput);
+}
+
+function handleSettingsInput(event) {
+  const input = event.target.closest?.('#settings-from, #settings-to');
+  if (!input) return;
+  const view = input.closest('.settings-view');
+  if (!view) return;
+  selectPreset(view, 'custom');
 }
 
 function handleSettingsClick(event) {
@@ -220,19 +228,20 @@ function saveCurrentPeriod(view) {
     return;
   }
 
-  const result = setActivePeriod(from, to, preset);
+  const result = saveActivePeriod({ modo: preset, desde: from, hasta: to }, { rememberConfigured: true });
   if (!result.success) {
     setFeedback(view, result.error || 'No se pudo guardar el período.', true);
     return;
   }
 
-  const persisted = loadSettings();
-  const savedPeriod = persisted?.activePeriod || {};
+  const savedPeriod = loadConfiguredPeriod();
+  const activePeriod = loadActivePeriod();
   const verified =
-    persisted?.schemaVersion === SCHEMA_VERSION &&
-    savedPeriod.from === from &&
-    savedPeriod.to === to &&
-    savedPeriod.preset === preset;
+    savedPeriod?.modo === preset &&
+    savedPeriod.desde === from &&
+    savedPeriod.hasta === to &&
+    activePeriod?.desde === from &&
+    activePeriod?.hasta === to;
 
   if (!verified) {
     setFeedback(view, 'No se pudo verificar la persistencia del período.', true);
@@ -246,7 +255,7 @@ function saveCurrentPeriod(view) {
 
 function resetPeriod(view) {
   const range = presetRange('month');
-  const result = setActivePeriod(range.from, range.to, 'month');
+  const result = saveActivePeriod({ modo: 'month', desde: range.from, hasta: range.to }, { rememberConfigured: true });
   if (!result.success) {
     setFeedback(view, result.error || 'No se pudo restablecer el período.', true);
     return;
@@ -309,7 +318,8 @@ function presetRange(preset) {
 }
 
 function normalizePreset(value) {
-  return ['month', 'quarter', 'custom'].includes(value) ? value : 'month';
+  if (['month', 'quarter', 'custom'].includes(value)) return value;
+  return value ? 'custom' : 'month';
 }
 
 function isValidDate(value) {

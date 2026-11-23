@@ -1,21 +1,24 @@
-import { loadSettings } from '../services/settings-service.js';
+import { loadActivePeriod, loadConfiguredPeriod, saveActivePeriod } from '../services/settings-service.js';
 import { filterEntries } from '../services/query-service.js';
 import { loadCollection } from '../storage.js';
 
 const POSTED_STATE = 'Contabilizada';
 const VISIBLE_MONTHS = 12;
 let refreshBound = false;
+let dashboardInteractionsBound = false;
 
 export function renderDashboard() {
-  const period = resolveActivePeriod(loadSettings());
+  const period = resolveActivePeriod(loadActivePeriod());
   const data = buildDashboardData(period);
 
   bindRefresh();
+  bindDashboardInteractions();
 
   const greetingText = greeting();
   const todayLabel = formatLongDate(new Date());
   const periodLabel = `${formatDate(period.from)} — ${formatDate(period.to)}`;
   const postedCount = data.entries.length;
+  const visibleCount = Math.min(postedCount, 5);
   const emptyHidden = postedCount > 0 ? ' hidden' : '';
   const maxFlow = Math.max(1, ...data.monthly.flatMap((month) => [month.ingresos, month.gastos]));
 
@@ -39,12 +42,34 @@ export function renderDashboard() {
               <div class="period-tabs" role="tablist" aria-label="Período contable activo">
                 <button class="period-tab selected" type="button" aria-selected="true">Período activo</button>
               </div>
-              <button class="date-filter" type="button">
-                <svg viewBox="0 0 24 24">
-                  <rect x="3" y="5" width="18" height="16" rx="2" />
-                  <path d="M16 3v4M8 3v4M3 11h18" /></svg
-                >${escapeHtml(periodLabel)}<svg class="chevron" viewBox="0 0 24 24"><path d="m7 10 5 5 5-5" /></svg>
-              </button>
+              <div class="period-picker" style="position: relative">
+                <button
+                  class="date-filter"
+                  id="period-picker-button"
+                  type="button"
+                  aria-haspopup="true"
+                  aria-expanded="false"
+                  aria-controls="period-menu"
+                >
+                  <svg viewBox="0 0 24 24">
+                    <rect x="3" y="5" width="18" height="16" rx="2" />
+                    <path d="M16 3v4M8 3v4M3 11h18" /></svg
+                  >${escapeHtml(periodLabel)}<svg class="chevron" viewBox="0 0 24 24"><path d="m7 10 5 5 5-5" /></svg>
+                </button>
+                <div
+                  class="period-menu"
+                  id="period-menu"
+                  role="menu"
+                  hidden
+                  style="position: absolute; right: 0; top: calc(100% + 6px); z-index: 30; min-width: 236px; padding: 6px; border: 1px solid #e6eaf0; border-radius: 8px; background: #fff; box-shadow: 0 12px 28px rgba(27, 39, 58, 0.16)"
+                >
+                  ${renderPeriodOption('active', 'Período activo configurado')}
+                  ${renderPeriodOption('month', 'Mes actual')}
+                  ${renderPeriodOption('quarter', 'Trimestre actual')}
+                  ${renderPeriodOption('year-2026', 'Año 2026')}
+                  ${renderPeriodOption('year-2025', 'Año anterior 2025')}
+                </div>
+              </div>
             </div>
 
             <div class="empty-state-panel" id="dashboard-empty"${emptyHidden}>
@@ -159,10 +184,12 @@ export function renderDashboard() {
                   </thead>
                   <tbody id="transactions-body">${renderTransactionRows(data.entries, data.accounts)}</tbody>
                 </table>
-                <div class="no-results" id="no-results" hidden>No se encontraron transacciones para esta búsqueda.</div>
+                <div class="no-results" id="no-results"${postedCount > 0 ? ' hidden' : ''}>
+                  No se encontraron transacciones para esta búsqueda.
+                </div>
               </div>
-              <div class="table-footer">
-                <span>Mostrando <strong>${Math.min(postedCount, 5)}</strong> de <strong>${postedCount}</strong> transacciones</span>
+              <div class="table-footer" data-total-entries="${postedCount}">
+                <span>Mostrando <strong id="visible-transactions">${visibleCount}</strong> de <strong id="total-transactions">${postedCount}</strong> transacciones</span>
               </div>
             </section>
             <footer class="page-footer">
@@ -173,10 +200,118 @@ export function renderDashboard() {
   `;
 }
 
+function bindDashboardInteractions() {
+  if (dashboardInteractionsBound || typeof document === 'undefined') return;
+  dashboardInteractionsBound = true;
+  document.addEventListener('input', handleDashboardInput);
+  document.addEventListener('click', handleDashboardClick);
+}
+
+function handleDashboardInput(event) {
+  if (!event.target.closest?.('#transaction-search')) return;
+  const query = String(event.target.value || '').trim().toLocaleLowerCase('es');
+  const rows = document.querySelectorAll('#transactions-body tr[data-search]');
+  let visibleCount = 0;
+
+  rows.forEach((row) => {
+    const matches = String(row.dataset.search || '').toLocaleLowerCase('es').includes(query);
+    row.hidden = !matches;
+    if (matches) visibleCount += 1;
+  });
+
+  updateTransactionFooter(visibleCount);
+  const noResults = document.querySelector('#no-results');
+  if (noResults) noResults.hidden = visibleCount !== 0;
+}
+
+function updateTransactionFooter(visibleCount) {
+  const footer = document.querySelector('.table-footer');
+  if (!footer) return;
+  const total = Number(footer.dataset.totalEntries || 0);
+  const visibleNode = footer.querySelector('#visible-transactions');
+  const totalNode = footer.querySelector('#total-transactions');
+  if (visibleNode) visibleNode.textContent = String(visibleCount);
+  if (totalNode) totalNode.textContent = String(total);
+}
+
+function handleDashboardClick(event) {
+  if (event.target.closest?.('#period-picker-button')) {
+    togglePeriodMenu();
+    return;
+  }
+
+  const option = event.target.closest?.('[data-period-option]');
+  if (option) {
+    applyQuickPeriod(option.dataset.periodOption);
+    return;
+  }
+
+  const menu = document.querySelector('#period-menu');
+  if (menu && !menu.hidden && !event.target.closest?.('.period-picker')) {
+    menu.hidden = true;
+    document.querySelector('#period-picker-button')?.setAttribute('aria-expanded', 'false');
+  }
+}
+
+function togglePeriodMenu() {
+  const menu = document.querySelector('#period-menu');
+  const button = document.querySelector('#period-picker-button');
+  if (!menu || !button) return;
+  const open = menu.hidden;
+  menu.hidden = !open;
+  button.setAttribute('aria-expanded', String(open));
+}
+
+function applyQuickPeriod(option) {
+  let period;
+
+  if (option === 'active') {
+    period = loadConfiguredPeriod();
+    if (!period) {
+      showToast('Configura un período activo en Configuración.');
+      return;
+    }
+  } else if (option === 'month') {
+    period = currentMonthPeriod();
+  } else if (option === 'quarter') {
+    period = currentQuarterPeriod();
+  } else if (option === 'year-2026') {
+    period = yearPeriod(2026);
+  } else if (option === 'year-2025') {
+    period = yearPeriod(2025);
+  } else {
+    return;
+  }
+
+  const result = saveActivePeriod(period);
+  if (!result.success) {
+    showToast(result.error || 'No se pudo actualizar el período.');
+    return;
+  }
+
+  refreshDashboardMetrics();
+  showToast(`Período actualizado: ${formatDate(period.desde)} — ${formatDate(period.hasta)}`);
+}
+
+function showToast(message) {
+  if (typeof window === 'undefined') return;
+  const toast = document.querySelector('#toast');
+  if (!toast) return;
+  toast.textContent = message;
+  toast.classList.add('show');
+  window.clearTimeout(showToast.timer);
+  showToast.timer = window.setTimeout(() => toast.classList.remove('show'), 2600);
+}
+
 export function refreshDashboardMetrics() {
   if (typeof document === 'undefined') return;
   const container = document.querySelector('#view-dashboard');
-  if (container) container.innerHTML = renderDashboard();
+  if (container) {
+    container.innerHTML = renderDashboard();
+    return;
+  }
+  const fallbackHost = document.querySelector('#period-menu')?.closest('.period-toolbar')?.parentElement;
+  if (fallbackHost) fallbackHost.innerHTML = renderDashboard();
 }
 
 function buildDashboardData(period) {
@@ -262,9 +397,11 @@ function calculateCashBalances(entries, accounts) {
 
 function buildMonthlySeries(period, accounts) {
   const keys = listMonths(period);
+  const firstKey = String(period.from).slice(0, 7);
+  const lastKey = String(period.to).slice(0, 7);
   return keys.map((key) => {
-    const from = `${key}-01`;
-    const to = `${key}-${lastDayOfMonth(key)}`;
+    const from = key === firstKey ? period.from : `${key}-01`;
+    const to = key === lastKey ? period.to : `${key}-${lastDayOfMonth(key)}`;
     const entries = filterEntries({
       fecha_desde: from,
       fecha_hasta: to,
@@ -296,30 +433,59 @@ function lastDayOfMonth(key) {
   return String(new Date(year, month, 0).getDate()).padStart(2, '0');
 }
 
-function resolveActivePeriod(settings) {
-  const active = settings?.activePeriod || {};
-  const from = typeof active.from === 'string' ? active.from : '';
-  const to = typeof active.to === 'string' ? active.to : '';
-  if (isValidDate(from) && isValidDate(to) && from <= to) return { from, to };
-
-  const now = new Date();
-  const year = now.getFullYear();
-  const month = now.getMonth();
-  if (active.preset === 'quarter') {
-    const firstMonth = Math.floor(month / 3) * 3;
-    const endMonth = firstMonth + 2;
-    return {
-      from: `${year}-${String(firstMonth + 1).padStart(2, '0')}-01`,
-      to: `${year}-${String(endMonth + 1).padStart(2, '0')}-${String(
-        new Date(year, endMonth + 1, 0).getDate(),
-      ).padStart(2, '0')}`,
-    };
+function resolveActivePeriod(storedPeriod) {
+  if (storedPeriod && isValidDate(storedPeriod.desde) && isValidDate(storedPeriod.hasta) && storedPeriod.desde <= storedPeriod.hasta) {
+    return { from: storedPeriod.desde, to: storedPeriod.hasta, modo: storedPeriod.modo };
   }
+  return currentMonthPeriod();
+}
 
+function currentMonthPeriod() {
+  const now = new Date();
+  return monthPeriod(now.getFullYear(), now.getMonth());
+}
+
+function currentQuarterPeriod() {
+  const now = new Date();
+  return quarterPeriod(now.getFullYear(), now.getMonth());
+}
+
+function monthPeriod(year, monthIndex) {
   return {
-    from: `${year}-${String(month + 1).padStart(2, '0')}-01`,
-    to: `${year}-${String(month + 1).padStart(2, '0')}-${String(new Date(year, month + 1, 0).getDate()).padStart(2, '0')}`,
+    from: `${year}-${String(monthIndex + 1).padStart(2, '0')}-01`,
+    to: `${year}-${String(monthIndex + 1).padStart(2, '0')}-${String(
+      new Date(year, monthIndex + 1, 0).getDate(),
+    ).padStart(2, '0')}`,
+    modo: 'month',
   };
+}
+
+function quarterPeriod(year, monthIndex) {
+  const firstMonth = Math.floor(monthIndex / 3) * 3;
+  const endMonth = firstMonth + 2;
+  return {
+    from: `${year}-${String(firstMonth + 1).padStart(2, '0')}-01`,
+    to: `${year}-${String(endMonth + 1).padStart(2, '0')}-${String(
+      new Date(year, endMonth + 1, 0).getDate(),
+    ).padStart(2, '0')}`,
+    modo: 'quarter',
+  };
+}
+
+function yearPeriod(year) {
+  return { from: `${year}-01-01`, to: `${year}-12-31`, modo: 'year' };
+}
+
+function renderPeriodOption(value, label) {
+  return `
+    <button
+      class="period-option"
+      data-period-option="${value}"
+      type="button"
+      role="menuitem"
+      style="display: block; width: 100%; padding: 8px 10px; border: 0; border-radius: 5px; background: transparent; color: #3b4758; font: 500 11px 'DM Sans', sans-serif; text-align: left; cursor: pointer"
+    >${escapeHtml(label)}</button>
+  `;
 }
 
 function isValidDate(value) {
@@ -372,9 +538,7 @@ function renderAccountProgress(balances) {
 
 function renderTransactionRows(entries, accounts) {
   const recent = entries.slice(0, 5);
-  if (!recent.length) {
-    return '<tr><td colspan="7" class="no-results">No hay asientos contabilizados en el período seleccionado.</td></tr>';
-  }
+  if (!recent.length) return '';
 
   const departments = [...loadCollection('@erp-department-base').records, ...loadCollection('centros-costo').records];
 
