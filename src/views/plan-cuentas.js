@@ -1,6 +1,10 @@
 import { loadCollection } from '../storage.js'
-import { addAccount, updateAccount } from '../domain/account.js'
-import { checkAccountIntegrity } from '../services/account-service.js'
+import { addAccount } from '../domain/account.js'
+import {
+  checkAccountIntegrity,
+  deleteAccount as deleteAccountService,
+  updateAccount as updateAccountService,
+} from '../services/account-service.js'
 
 let editingId = null
 
@@ -100,8 +104,8 @@ function renderAccountList(accounts) {
 
     const canDelete = integrity.allowed
     const deleteBtn = canDelete
-      ? `<button class="text-link" data-action="delete" data-account-id="${account.id}">Eliminar</button>`
-      : `<button class="text-link danger" data-action="desactivar" data-account-id="${account.id}">Desactivar cuenta</button>`
+      ? `<button type="button" class="text-link" data-action="delete" data-account-id="${account.id}">Eliminar</button>`
+      : `<button type="button" class="text-link danger" data-action="desactivar" data-account-id="${account.id}">Desactivar cuenta</button>`
 
     html += `
       <div style="border: 1px solid #e0e7ff; border-radius: 8px; padding: 12px; margin: 8px 0; background: #f8fbff">
@@ -125,20 +129,7 @@ function renderAccountList(accounts) {
   return `<div style="max-height: 400px; overflow-y: auto;">${html}</div>`
 }
 
-export function render() {
-  const accounts = loadCollection('accounts').records
-  editingId = null
-
-  // Always bind listeners since HTML is replaced on re-render
-  const form = document.querySelector('#account-form')
-  if (form) {
-    form.addEventListener('submit', handleFormSubmit)
-    document.querySelector('#cancel-account')?.addEventListener('click', handleCancel)
-  }
-
-  // Bind account list action listeners
-  bindAccountListListeners()
-
+function renderView(accounts) {
   return `
     <section class="accounts-view">
       <div class="panel-heading">
@@ -158,96 +149,185 @@ export function render() {
   `
 }
 
-function handleFormSubmit(e) {
-  e.preventDefault()
+export function render() {
+  const accounts = loadCollection('accounts').records
+  editingId = null
+  queueMicrotask(bindViewListeners)
+  return renderView(accounts)
+}
 
-  const codigo = document.querySelector('#account-codigo').value.trim()
-  const nombre = document.querySelector('#account-nombre').value.trim()
-  const tipo = document.querySelector('#account-tipo').value
-  const naturaleza = document.querySelector('#account-naturaleza').value
-  const id_cuenta_padre = document.querySelector('#account-padre').value
-  const activa = document.querySelector('#account-activa').value === 'true'
+function refreshView() {
+  const currentView = document.querySelector('.accounts-view')
+  if (!currentView) return
 
-  const account = { codigo, nombre, tipo, naturaleza, id_cuenta_padre, activa }
+  const container = document.createElement('div')
+  container.innerHTML = renderView(loadCollection('accounts').records)
+  currentView.replaceWith(container.firstElementChild)
+  bindViewListeners()
+}
 
-  // Validate duplicate code
+function bindViewListeners() {
+  const form = document.querySelector('.accounts-view #account-form')
+  if (form && !form.dataset.bound) {
+    form.dataset.bound = 'true'
+    form.addEventListener('submit', handleFormSubmit)
+  }
+
+  const cancelButton = document.querySelector('.accounts-view #cancel-account')
+  if (cancelButton && !cancelButton.dataset.bound) {
+    cancelButton.dataset.bound = 'true'
+    cancelButton.addEventListener('click', handleCancel)
+  }
+
+  bindAccountListListeners()
+}
+
+function handleFormSubmit(event) {
+  event.preventDefault()
+
+  const form = event.currentTarget
+  const codigo = form.querySelector('#account-codigo').value.trim()
+  const nombre = form.querySelector('#account-nombre').value.trim()
+  const tipo = form.querySelector('#account-tipo').value
+  const naturaleza = form.querySelector('#account-naturaleza').value
+  const id_cuenta_padre = form.querySelector('#account-padre').value
+  const activa = form.querySelector('#account-activa').value === 'true'
+
   const existingAccounts = loadCollection('accounts').records
+  const currentAccount = editingId
+    ? existingAccounts.find((a) => a.id === editingId)
+    : null
+
+  const account = {
+    codigo,
+    nombre,
+    tipo,
+    naturaleza,
+    id_cuenta_padre,
+    activa,
+    acepta_movimientos: currentAccount?.acepta_movimientos ?? true,
+    es_efectivo: currentAccount?.es_efectivo ?? false,
+  }
+
   const codeExists = existingAccounts.some(
     (a) => a.codigo === codigo && a.id !== editingId
   )
-
   if (codeExists) {
     showError('Ya existe una cuenta con ese código')
     return
   }
 
-  // Validate no self-parent
-  if (id_cuenta_padre && id_cuenta_padre === (editingId || '')) {
+  if (id_cuenta_padre && id_cuenta_padre === editingId) {
     showError('Una cuenta no puede ser su propia padre')
     return
   }
 
-      if (id_cuenta_padre) {
-    const accountsForCheck = loadCollection('accounts').records
-    const parentAccount = accountsForCheck.find((a) => a.id === id_cuenta_padre)
-    if (parentAccount && parentAccount.id_cuenta_padre === editingId) {
-      showError('No se puede crear un ciclo jerárquico: la cuenta padre ya tiene este account como hijo')
+  if (creaCicloJerarquico(editingId, id_cuenta_padre, existingAccounts)) {
+    showError('No se puede crear un ciclo jerárquico con la cuenta padre seleccionada')
+    return
+  }
+
+  try {
+    const result = editingId
+      ? updateAccountService(editingId, account)
+      : addAccount(account)
+
+    if (!result.success) {
+      const errorMsg = result.errors?.length > 0
+        ? result.errors.join('; ')
+        : result.error || 'Error desconocido'
+      showError(errorMsg)
       return
     }
-  }
 
-  const result = editingId
-    ? updateAccount(editingId, account)
-    : addAccount(account)
-
-  if (result.success) {
     showToast(editingId ? 'Cuenta actualizada correctamente' : 'Cuenta guardada correctamente')
     editingId = null
-    render()
-  } else {
-    const errorMsg = (result.errors && result.errors.length > 0
-      ? result.errors.join('; ')
-      : result.error || 'Error desconocido')
-    showError(errorMsg)
+    refreshView()
+  } catch (error) {
+    showError(`No se pudo guardar la cuenta: ${getErrorMessage(error)}`)
   }
+}
+
+function creaCicloJerarquico(accountId, parentId, accounts) {
+  if (!accountId || !parentId) return false
+
+  const visited = new Set()
+  let currentId = parentId
+  while (currentId) {
+    if (currentId === accountId || visited.has(currentId)) return true
+    visited.add(currentId)
+    const current = accounts.find((a) => a.id === currentId)
+    currentId = current?.id_cuenta_padre || null
+  }
+  return false
 }
 
 function handleCancel() {
   editingId = null
-  render()
+  refreshView()
 }
 
 function showError(message) {
-  const existing = document.querySelectorAll('.account-error')
-  existing.forEach((el) => el.remove())
+  const view = document.querySelector('.accounts-view')
+  if (!view) return
 
-  const errorDiv = document.createElement('div')
-  errorDiv.className = 'account-error'
-  errorDiv.textContent = message
-  errorDiv.style.color = '#d98260'
-  errorDiv.style.background = '#fff4f0'
-  errorDiv.style.padding = '8px 12px'
-  errorDiv.style.borderRadius = '4px'
-  errorDiv.style.marginTop = '8px'
-  errorDiv.style.fontSize = '12px'
+  view.querySelectorAll('.account-error').forEach((el) => el.remove())
 
-  const form = document.querySelector('#account-form')
-  if (form && form.parentNode) {
-    form.parentNode.insertBefore(errorDiv, form.nextSibling)
-  }
+  const banner = document.createElement('div')
+  banner.className = 'account-error'
+  banner.setAttribute('role', 'alert')
+  banner.setAttribute('aria-live', 'assertive')
+  banner.textContent = message
+  banner.style.color = '#b42318'
+  banner.style.background = '#fee4e2'
+  banner.style.border = '1px solid #fda29b'
+  banner.style.padding = '10px 12px'
+  banner.style.borderRadius = '6px'
+  banner.style.margin = '12px 0'
+  banner.style.fontSize = '12px'
+  banner.style.fontWeight = '600'
+
+  const heading = view.querySelector('.panel-heading')
+  if (heading) heading.after(banner)
+  else view.prepend(banner)
+}
+
+function getErrorMessage(error) {
+  return error instanceof Error ? error.message : String(error)
 }
 
 function bindAccountListListeners() {
-  document.querySelectorAll('[data-action="delete"], [data-action="desactivar"]').forEach((btn) => {
-    btn.addEventListener('click', () => {
-      const accountId = btn.dataset.accountId
-      if (btn.dataset.action === 'delete') {
-        import('../services/account-service.js').then(mod => mod.deleteAccount(accountId))
-      } else if (btn.dataset.action === 'desactivar') {
-        import('../services/account-service.js').then(mod => mod.updateAccount(accountId, { activa: false }))
-      }
+  document
+    .querySelectorAll(
+      '.accounts-view [data-action="delete"], .accounts-view [data-action="desactivar"]'
+    )
+    .forEach((btn) => {
+      if (btn.dataset.bound) return
+      btn.dataset.bound = 'true'
+
+      btn.addEventListener('click', () => {
+        const accountId = btn.dataset.accountId
+        const isDelete = btn.dataset.action === 'delete'
+
+        try {
+          const result = isDelete
+            ? deleteAccountService(accountId)
+            : updateAccountService(accountId, { activa: false })
+
+          if (!result.success) {
+            showError(result.error || 'No se pudo completar la operación')
+            return
+          }
+
+          showToast(isDelete ? 'Cuenta eliminada correctamente' : 'Cuenta desactivada correctamente')
+          refreshView()
+        } catch (error) {
+          showError(
+            `No se pudo ${isDelete ? 'eliminar' : 'desactivar'} la cuenta: ${getErrorMessage(error)}`
+          )
+        }
+      })
     })
-  })
 }
 
 function showToast(message) {
