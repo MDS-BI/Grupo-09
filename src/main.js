@@ -1,4 +1,5 @@
 import { ensureSeedData } from './utils/seed.js';
+import { loadCollection } from './storage.js';
 import { renderDashboard } from './views/dashboard.js';
 import { render as renderConfiguracion, viewInfo as configuracionInfo } from './views/configuracion.js';
 import { render as renderPlanCuentas, viewInfo as planCuentasInfo } from './views/plan-cuentas.js';
@@ -55,19 +56,26 @@ function normalizeView(view) {
   return viewAliases[view] ?? 'dashboard';
 }
 
+function updateTransactionCount() {
+  const badge = document.querySelector('.nav-item[data-view="transacciones"] .nav-count');
+  if (!badge) return;
+  badge.textContent = String(loadCollection('entries').records.length);
+}
+
 function navigate(view) {
   const route = normalizeView(view);
   const info = views[route];
   const isDashboard = route === 'dashboard';
 
-  if (isDashboard) {
-    dashboardView.hidden = false;
-    dashboardView.innerHTML = info.render();
-  } else {
-    dashboardView.hidden = true;
-    placeholderView.hidden = false;
-    placeholderView.innerHTML = info.render();
-  }
+  dashboardView.innerHTML = '';
+  placeholderView.innerHTML = '';
+  dashboardView.hidden = !isDashboard;
+  placeholderView.hidden = isDashboard;
+
+  const activeView = isDashboard ? dashboardView : placeholderView;
+  activeView.innerHTML = info.render();
+
+  updateTransactionCount();
 
   const breadcrumb = document.querySelector('#breadcrumb-current');
   if (breadcrumb) breadcrumb.textContent = info.breadcrumb;
@@ -135,6 +143,14 @@ document.querySelector('#sidebar-toggle')?.addEventListener('click', (event) => 
   const collapsed = document.body.classList.contains('sidebar-collapsed');
   event.currentTarget.setAttribute('aria-label', collapsed ? 'Expandir menú' : 'Contraer menú');
 });
+
+window.addEventListener('storage', (event) => {
+  if (!event.key || event.key.startsWith('@erp') || event.key === 'finance-data') {
+    updateTransactionCount();
+  }
+});
+window.addEventListener('pageshow', updateTransactionCount);
+document.addEventListener('finance:data-changed', updateTransactionCount);
 
 ensureSeedData();
 navigate('dashboard');

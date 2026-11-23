@@ -1,4 +1,3 @@
-import { aggregatePostedEntries } from '../services/metrics-service.js';
 import { loadSettings } from '../services/settings-service.js';
 import { filterEntries } from '../services/query-service.js';
 import { loadCollection } from '../storage.js';
@@ -73,8 +72,8 @@ export function renderDashboard() {
                   <strong class="cashflow-total" id="cash-flow-total">${escapeHtml(formatCurrency(data.metrics.flujoCaja))}</strong>
                 </div>
                 <div class="chart-legend">
-                  <span><i class="legend-dot legend-income"></i>Ingresos</span
-                  ><span><i class="legend-dot legend-expense"></i>Gastos</span
+                  <span><i class="legend-dot legend-income"></i>Entradas de efectivo</span
+                  ><span><i class="legend-dot legend-expense"></i>Salidas de efectivo</span
                   ><strong>${escapeHtml(periodYears(period))}</strong>
                 </div>
                 <div class="chart-area">
@@ -87,7 +86,7 @@ export function renderDashboard() {
                     <div class="chart-gridlines"><i></i><i></i><i></i><i></i><i></i></div>
                     ${
                       data.monthly.length
-                        ? `<div class="bar-chart" aria-label="Flujo mensual de ingresos y gastos">
+                        ? `<div class="bar-chart" aria-label="Flujo mensual de entradas y salidas de efectivo">
                             ${data.monthly
                               .map(
                                 (month) => `
@@ -181,13 +180,13 @@ export function refreshDashboardMetrics() {
 }
 
 function buildDashboardData(period) {
-  const metrics = aggregatePostedEntries(period.from, period.to);
   const accounts = loadCollection('accounts').records;
   const entries = filterEntries({
     fecha_desde: period.from,
     fecha_hasta: period.to,
     estado: POSTED_STATE,
   }).sort((left, right) => String(right.fecha_contable).localeCompare(String(left.fecha_contable)));
+  const metrics = summarizeEntries(entries, accounts);
 
   const cashBalances = calculateCashBalances(entries, accounts);
   const saldoDisponible = cashBalances.reduce((sum, item) => sum + item.amount, 0);
@@ -198,8 +197,52 @@ function buildDashboardData(period) {
     accounts,
     cashBalances,
     saldoDisponible: +saldoDisponible.toFixed(4),
-    monthly: buildMonthlySeries(period),
+    monthly: buildMonthlySeries(period, accounts),
   };
+}
+
+function summarizeEntries(entries, accounts) {
+  let ingresos = 0;
+  let gastos = 0;
+  let entradasEfectivo = 0;
+  let salidasEfectivo = 0;
+
+  for (const entry of entries) {
+    for (const line of entry.detalles || []) {
+      const account = accounts.find((item) => item.id === line.id_cuenta);
+      if (!account) continue;
+
+      const debe = Number(line.monto_debe) || 0;
+      const haber = Number(line.monto_haber) || 0;
+
+      if (account.tipo === 'Ingreso') ingresos += haber - debe;
+      if (account.tipo === 'Gasto') gastos += debe - haber;
+
+      if (isCashInflowAccount(account)) entradasEfectivo += debe;
+      if (isCashOutflowAccount(account)) salidasEfectivo += haber;
+    }
+  }
+
+  const resultadoNeto = ingresos - gastos;
+  const flujoCaja = entradasEfectivo - salidasEfectivo;
+
+  return {
+    ingresos: +ingresos.toFixed(4),
+    gastos: +gastos.toFixed(4),
+    resultadoNeto: +resultadoNeto.toFixed(4),
+    flujoCaja: +flujoCaja.toFixed(4),
+    entradasEfectivo: +entradasEfectivo.toFixed(4),
+    salidasEfectivo: +salidasEfectivo.toFixed(4),
+  };
+}
+
+function isCashInflowAccount(account) {
+  if (account.es_efectivo === true) return true;
+  return account.tipo === 'Activo' && String(account.codigo || '').startsWith('1');
+}
+
+function isCashOutflowAccount(account) {
+  return account.es_efectivo === true;
 }
 
 function calculateCashBalances(entries, accounts) {
@@ -217,16 +260,21 @@ function calculateCashBalances(entries, accounts) {
   return Array.from(balances.values()).map((item) => ({ ...item, amount: +item.amount.toFixed(4) }));
 }
 
-function buildMonthlySeries(period) {
+function buildMonthlySeries(period, accounts) {
   const keys = listMonths(period);
   return keys.map((key) => {
     const from = `${key}-01`;
     const to = `${key}-${lastDayOfMonth(key)}`;
-    const metrics = aggregatePostedEntries(from, to);
+    const entries = filterEntries({
+      fecha_desde: from,
+      fecha_hasta: to,
+      estado: POSTED_STATE,
+    });
+    const summary = summarizeEntries(entries, accounts);
     const label = new Intl.DateTimeFormat('es', { month: 'short' })
       .format(new Date(`${key}-01T00:00:00`))
       .replace('.', '');
-    return { label, ingresos: metrics.ingresos, gastos: metrics.gastos };
+    return { label, ingresos: summary.entradasEfectivo, gastos: summary.salidasEfectivo };
   });
 }
 
