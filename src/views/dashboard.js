@@ -6,6 +6,7 @@ const POSTED_STATE = 'Contabilizada';
 const VISIBLE_MONTHS = 12;
 let refreshBound = false;
 let dashboardInteractionsBound = false;
+let activeRowMenu = null;
 
 export function renderDashboard() {
   const period = resolveActivePeriod(loadActivePeriod());
@@ -204,7 +205,18 @@ function bindDashboardInteractions() {
   if (dashboardInteractionsBound || typeof document === 'undefined') return;
   dashboardInteractionsBound = true;
   document.addEventListener('input', handleDashboardInput);
-  document.addEventListener('click', handleDashboardClick);
+  document.addEventListener('click', handleDashboardDocumentClick);
+  const dashboardView = document.querySelector('#view-dashboard');
+  dashboardView?.addEventListener('click', handleDashboardViewClick, true);
+}
+
+function cleanupDashboardListeners() {
+  if (typeof document === 'undefined') return;
+  document.removeEventListener('click', handleDashboardDocumentClick);
+  const dashboardView = document.querySelector('#view-dashboard');
+  dashboardView?.removeEventListener('click', handleDashboardViewClick, true);
+  dashboardInteractionsBound = false;
+  closeRowMenu();
 }
 
 function handleDashboardInput(event) {
@@ -234,22 +246,54 @@ function updateTransactionFooter(visibleCount) {
   if (totalNode) totalNode.textContent = String(total);
 }
 
-function handleDashboardClick(event) {
+function handleDashboardDocumentClick(event) {
+  const periodMenu = document.querySelector('#period-menu');
+  if (periodMenu && !periodMenu.hidden && !event.target.closest?.('.period-picker')) {
+    periodMenu.hidden = true;
+    document.querySelector('#period-picker-button')?.setAttribute('aria-expanded', 'false');
+  }
+
+  if (activeRowMenu && !event.target.closest?.('.row-action-menu') && !event.target.closest?.('.row-more')) {
+    closeRowMenu();
+  }
+}
+
+function handleDashboardViewClick(event) {
+  if (event.target.closest?.('#export-button')) {
+    event.preventDefault();
+    event.stopPropagation();
+    exportDashboardCsv();
+    return;
+  }
+
+  const rowMore = event.target.closest?.('.row-more');
+  if (rowMore) {
+    event.preventDefault();
+    event.stopPropagation();
+    toggleRowMenu(rowMore);
+    return;
+  }
+
+  const menuAction = event.target.closest?.('[data-row-action]');
+  if (menuAction) {
+    event.preventDefault();
+    event.stopPropagation();
+    handleRowMenuAction(menuAction);
+    return;
+  }
+
   if (event.target.closest?.('#period-picker-button')) {
+    event.preventDefault();
+    event.stopPropagation();
     togglePeriodMenu();
     return;
   }
 
   const option = event.target.closest?.('[data-period-option]');
   if (option) {
+    event.preventDefault();
+    event.stopPropagation();
     applyQuickPeriod(option.dataset.periodOption);
-    return;
-  }
-
-  const menu = document.querySelector('#period-menu');
-  if (menu && !menu.hidden && !event.target.closest?.('.period-picker')) {
-    menu.hidden = true;
-    document.querySelector('#period-picker-button')?.setAttribute('aria-expanded', 'false');
   }
 }
 
@@ -303,8 +347,149 @@ function showToast(message) {
   showToast.timer = window.setTimeout(() => toast.classList.remove('show'), 2600);
 }
 
+function closeRowMenu() {
+  if (activeRowMenu?.element?.isConnected) {
+    activeRowMenu.element.remove();
+  }
+  if (activeRowMenu?.cell?.isConnected) {
+    activeRowMenu.cell.style.position = '';
+    activeRowMenu.cell.style.zIndex = '';
+  }
+  const wrap = document.querySelector('#view-dashboard .table-wrap');
+  if (wrap) wrap.style.overflow = '';
+  activeRowMenu = null;
+}
+
+function toggleRowMenu(button) {
+  const row = button.closest('tr[data-entry-id]');
+  if (!row) return;
+  const entryId = row.dataset.entryId;
+  const doc = row.dataset.entryDoc || '';
+  const same = activeRowMenu?.entryId === entryId;
+  closeRowMenu();
+  if (same) return;
+
+  const cell = button.closest('td');
+  const wrap = document.querySelector('#view-dashboard .table-wrap');
+  if (!cell || !wrap) return;
+
+  cell.style.position = 'relative';
+  cell.style.zIndex = '40';
+  wrap.style.overflow = 'visible';
+
+  const menu = document.createElement('div');
+  menu.className = 'row-action-menu';
+  menu.setAttribute('role', 'menu');
+  menu.style.cssText =
+    'position:absolute;right:0;top:calc(100% + 4px);z-index:50;min-width:180px;padding:6px;border:1px solid #e6eaf0;border-radius:8px;background:#fff;box-shadow:0 12px 28px rgba(27,39,58,.16);display:flex;flex-direction:column;gap:2px;';
+  menu.innerHTML = `
+    <button type="button" role="menuitem" data-row-action="view" data-entry-id="${escapeHtml(entryId)}" style="display:block;width:100%;padding:8px 10px;border:0;border-radius:5px;background:transparent;color:#3b4758;font:500 12px 'DM Sans',sans-serif;text-align:left;cursor:pointer">Ver en Transacciones</button>
+    <button type="button" role="menuitem" data-row-action="copy" data-entry-doc="${escapeHtml(doc)}" style="display:block;width:100%;padding:8px 10px;border:0;border-radius:5px;background:transparent;color:#3b4758;font:500 12px 'DM Sans',sans-serif;text-align:left;cursor:pointer">Copiar documento</button>
+  `;
+  cell.appendChild(menu);
+  activeRowMenu = { entryId, element: menu, cell };
+}
+
+function handleRowMenuAction(action) {
+  const type = action.dataset.rowAction;
+  if (type === 'view') {
+    closeRowMenu();
+    navigateToTransactions();
+    return;
+  }
+  if (type === 'copy') {
+    const doc = action.dataset.entryDoc || '';
+    copyDocument(doc);
+  }
+}
+
+function navigateToTransactions() {
+  const goButton = document.querySelector('#view-dashboard [data-go="transacciones"]');
+  if (goButton) {
+    goButton.click();
+    return;
+  }
+  window.location.hash = '#transacciones';
+}
+
+function exportDashboardCsv() {
+  const period = resolveActivePeriod(loadActivePeriod());
+  const data = buildDashboardData(period);
+  const periodLabel = `${formatDate(period.from)} — ${formatDate(period.to)}`;
+  const departments = [...loadCollection('@erp-department-base').records, ...loadCollection('centros-costo').records];
+  const rows = [];
+
+  rows.push(['Resumen financiero']);
+  rows.push(['Período activo', periodLabel]);
+  rows.push([]);
+  rows.push(['Indicadores KPI']);
+  rows.push(['Indicador', 'Valor']);
+  rows.push(['Ingresos totales', formatCurrency(data.metrics.ingresos)]);
+  rows.push(['Gastos totales', formatCurrency(data.metrics.gastos)]);
+  rows.push(['Resultado neto', formatCurrency(data.metrics.resultadoNeto)]);
+  rows.push(['Saldo disponible', formatCurrency(data.saldoDisponible)]);
+  rows.push(['Flujo de caja', formatCurrency(data.metrics.flujoCaja)]);
+  rows.push([]);
+  rows.push(['Asientos contabilizados del período activo']);
+  rows.push(['Fecha', 'Descripción', 'Documento', 'Cuenta', 'Centro de costo', 'Estado', 'Importe']);
+
+  data.entries.forEach((entry) => {
+    const detalles = Array.isArray(entry.detalles) && entry.detalles.length ? entry.detalles : [{}];
+    detalles.forEach((line) => {
+      const account = data.accounts.find((item) => item.id === line.id_cuenta);
+      const department = departments.find((item) => item.id === line.id_departamento);
+      const amount = (Number(line.monto_debe) || 0) - (Number(line.monto_haber) || 0);
+      rows.push([
+        formatDate(entry.fecha_contable),
+        entry.descripcion || 'Asiento contable',
+        entry.numero_documento || entry.tipo_documento || entry.id || '',
+        account?.nombre || '—',
+        department?.nombre || '—',
+        entry.estado || '',
+        formatCurrency(amount),
+      ]);
+    });
+  });
+
+  const csv = rows.map((row) => row.map(csvCell).join(',')).join('\r\n');
+  const blob = new Blob(['\uFEFF', csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = 'resumen-financiero.csv';
+  link.style.display = 'none';
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+  showToast('Descarga completada: resumen-financiero.csv');
+}
+
+function csvCell(value) {
+  const text = String(value ?? '');
+  return `"${text.replace(/"/g, '""')}"`;
+}
+
+async function copyDocument(doc) {
+  const value = String(doc || '').trim();
+  if (!value) {
+    closeRowMenu();
+    showToast('No hay documento para copiar.');
+    return;
+  }
+  try {
+    await navigator.clipboard.writeText(value);
+    closeRowMenu();
+    showToast(`Documento copiado: ${value}`);
+  } catch {
+    closeRowMenu();
+    showToast('No se pudo copiar el documento.');
+  }
+}
+
 export function refreshDashboardMetrics() {
   if (typeof document === 'undefined') return;
+  cleanupDashboardListeners();
   const container = document.querySelector('#view-dashboard');
   if (container) {
     container.innerHTML = renderDashboard();
@@ -548,6 +733,7 @@ function renderTransactionRows(entries, accounts) {
       const account = accounts.find((item) => item.id === firstLine.id_cuenta);
       const department = departments.find((item) => item.id === firstLine.id_departamento);
       const total = (entry.detalles || []).reduce((sum, line) => sum + (Number(line.monto_debe) || 0), 0);
+      const doc = entry.numero_documento || entry.tipo_documento || entry.id || '';
       const searchText = [
         entry.descripcion,
         entry.numero_documento,
@@ -560,13 +746,13 @@ function renderTransactionRows(entries, accounts) {
         .join(' ');
 
       return `
-        <tr data-search="${escapeHtml(searchText.toLowerCase())}">
+        <tr data-search="${escapeHtml(searchText.toLowerCase())}" data-entry-id="${escapeHtml(entry.id || '')}" data-entry-doc="${escapeHtml(doc)}">
           <td>
             <span class="transaction-icon ${total >= 0 ? 'transaction-income' : 'transaction-expense'}"
               ><svg viewBox="0 0 24 24"><path d="M12 19V5m-7 7 7-7 7 7" /></svg></span
             ><span class="transaction-main"
               ><strong>${escapeHtml(entry.descripcion || 'Asiento contable')}</strong
-              ><small>${escapeHtml(entry.numero_documento || entry.tipo_documento || entry.id || '')}</small></span
+              ><small>${escapeHtml(doc)}</small></span
             >
           </td>
           <td>${escapeHtml(account?.nombre || '—')}</td>
@@ -578,7 +764,7 @@ function renderTransactionRows(entries, accounts) {
           )}</td>
           <td><button class="row-more" type="button" aria-label="Acciones para ${escapeHtml(
             entry.descripcion || entry.id || 'asiento',
-          )}">···</button></td>
+          )}" aria-haspopup="menu">···</button></td>
         </tr>
       `;
     })
