@@ -1,9 +1,8 @@
 import { loadCollection } from '../storage.js'
-import { addAccount } from '../domain/account.js'
+import { addAccount, updateAccount } from '../domain/account.js'
 import {
   checkAccountIntegrity,
   deleteAccount as deleteAccountService,
-  updateAccount as updateAccountService,
 } from '../services/account-service.js'
 
 let editingId = null
@@ -44,7 +43,7 @@ function renderAccountForm(account = {}, allAccounts = []) {
   return `
     <div class="account-form-card" style="max-width: 500px; margin: 0 auto">
       <h3 style="margin: 0 0 12px; font: 700 13px Manrope, sans-serif; color: #263244">
-        ${isEditing ? 'Editar cuenta' : 'Nueva cuenta contable'}
+        ${isEditing ? 'Editar cuenta contable' : 'Nueva cuenta contable'}
       </h3>
       <form id="account-form">
         <div class="form-group">
@@ -52,8 +51,7 @@ function renderAccountForm(account = {}, allAccounts = []) {
           <input type="text" id="account-codigo"
             value="${acc.codigo || ''}"
             placeholder="1100"
-            required
-            ${isEditing ? 'disabled' : ''} />
+            required />
         </div>
         <div class="form-group">
           <label for="account-nombre">Nombre de la cuenta</label>
@@ -119,7 +117,8 @@ function renderAccountList(accounts) {
           <span style="margin-left: 12px">Estado: ${account.activa === true ? 'Activa' : 'Inactiva'}</span>
         </div>
         <div style="display: flex; gap: 8px; margin-top: 8px">
-          ${canDelete ? deleteBtn : ''}
+          <button type="button" class="text-link" data-action="edit" data-account-id="${account.id}">Editar</button>
+          ${deleteBtn}
         </div>
         ${!canDelete ? `<span style="font-size: 8px; color: #d98260; margin-top: 4px;">${integrity.reason || 'No se puede eliminar'}</span>` : ''}
       </div>
@@ -130,6 +129,10 @@ function renderAccountList(accounts) {
 }
 
 function renderView(accounts) {
+  const editingAccount = editingId !== null
+    ? accounts.find((a) => a.id === editingId) || {}
+    : {}
+
   return `
     <section class="accounts-view">
       <div class="panel-heading">
@@ -138,7 +141,7 @@ function renderView(accounts) {
       </div>
 
       <div class="account-form-section" style="max-width: 600px; margin: 20px 0">
-        ${renderAccountForm({}, accounts)}
+        ${renderAccountForm(editingAccount, accounts)}
       </div>
 
       <div class="account-list-section" style="max-width: 600px; margin: 0 auto">
@@ -182,6 +185,8 @@ function bindViewListeners() {
   bindAccountListListeners()
 }
 
+class ValidationError extends Error {}
+
 function handleFormSubmit(event) {
   event.preventDefault()
 
@@ -209,42 +214,46 @@ function handleFormSubmit(event) {
     es_efectivo: currentAccount?.es_efectivo ?? false,
   }
 
-  const codeExists = existingAccounts.some(
-    (a) => a.codigo === codigo && a.id !== editingId
-  )
-  if (codeExists) {
-    showError('Ya existe una cuenta con ese código')
-    return
-  }
-
-  if (id_cuenta_padre && id_cuenta_padre === editingId) {
-    showError('Una cuenta no puede ser su propia padre')
-    return
-  }
-
-  if (creaCicloJerarquico(editingId, id_cuenta_padre, existingAccounts)) {
-    showError('No se puede crear un ciclo jerárquico con la cuenta padre seleccionada')
-    return
-  }
-
   try {
-    const result = editingId
-      ? updateAccountService(editingId, account)
+    const codeExists = existingAccounts.some(
+      (a) => a.codigo === codigo && a.id !== editingId
+    )
+    if (codeExists) {
+      throw new ValidationError('Ya existe una cuenta con ese código')
+    }
+
+    if (id_cuenta_padre && id_cuenta_padre === editingId) {
+      throw new ValidationError('Una cuenta no puede ser su propia padre')
+    }
+
+    const integrity = editingId !== null ? checkAccountIntegrity(editingId) : null
+    if (integrity && integrity.allowed === false && /ciclo/i.test(integrity.reason || '')) {
+      throw new ValidationError(integrity.reason)
+    }
+
+    if (creaCicloJerarquico(editingId, id_cuenta_padre, existingAccounts)) {
+      throw new ValidationError('No se puede crear un ciclo jerárquico con la cuenta padre seleccionada')
+    }
+
+    const result = editingId !== null
+      ? updateAccount(editingId, account)
       : addAccount(account)
 
     if (!result.success) {
       const errorMsg = result.errors?.length > 0
         ? result.errors.join('; ')
         : result.error || 'Error desconocido'
-      showError(errorMsg)
-      return
+      throw new Error(errorMsg)
     }
 
-    showToast(editingId ? 'Cuenta actualizada correctamente' : 'Cuenta guardada correctamente')
+    showToast(editingId !== null ? 'Cuenta actualizada correctamente' : 'Cuenta guardada correctamente')
     editingId = null
+    clearError()
     refreshView()
   } catch (error) {
-    showError(`No se pudo guardar la cuenta: ${getErrorMessage(error)}`)
+    showError(error instanceof ValidationError
+      ? error.message
+      : `No se pudo guardar la cuenta: ${getErrorMessage(error)}`)
   }
 }
 
@@ -262,9 +271,29 @@ function creaCicloJerarquico(accountId, parentId, accounts) {
   return false
 }
 
+function startEditing(accountId) {
+  const account = loadCollection('accounts').records.find((a) => a.id === accountId)
+  if (!account) {
+    showError('Cuenta no encontrada')
+    return
+  }
+
+  editingId = accountId
+  clearError()
+  refreshView()
+  document
+    .querySelector('.accounts-view .account-form-section')
+    ?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+}
+
 function handleCancel() {
   editingId = null
+  clearError()
   refreshView()
+}
+
+function clearError() {
+  document.querySelectorAll('.accounts-view .account-error').forEach((el) => el.remove())
 }
 
 function showError(message) {
@@ -299,7 +328,7 @@ function getErrorMessage(error) {
 function bindAccountListListeners() {
   document
     .querySelectorAll(
-      '.accounts-view [data-action="delete"], .accounts-view [data-action="desactivar"]'
+      '.accounts-view [data-action="edit"], .accounts-view [data-action="delete"], .accounts-view [data-action="desactivar"]'
     )
     .forEach((btn) => {
       if (btn.dataset.bound) return
@@ -307,12 +336,19 @@ function bindAccountListListeners() {
 
       btn.addEventListener('click', () => {
         const accountId = btn.dataset.accountId
-        const isDelete = btn.dataset.action === 'delete'
+        const action = btn.dataset.action
+
+        if (action === 'edit') {
+          startEditing(accountId)
+          return
+        }
+
+        const isDelete = action === 'delete'
 
         try {
           const result = isDelete
             ? deleteAccountService(accountId)
-            : updateAccountService(accountId, { activa: false })
+            : updateAccount(accountId, { activa: false })
 
           if (!result.success) {
             showError(result.error || 'No se pudo completar la operación')
