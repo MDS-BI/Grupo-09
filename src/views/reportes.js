@@ -1,7 +1,6 @@
 import { loadCollection } from '../storage.js';
 import { ENTRY_STATE } from '../domain/entry.js';
 
-import { filterEntries } from '../services/query-service.js';
 import { loadSettings } from '../services/settings-service.js';
 import { formatAmount } from '../utils/money.js';
 
@@ -13,7 +12,8 @@ export const viewInfo = {
 };
 
 const state = { preset: 'active', from: '', to: '', activeTab: 'resultado' };
-let listenersBound = false;
+let boundDocument = null;
+let boundWindow = null;
 
 export function render() {
   bindListeners();
@@ -50,7 +50,12 @@ export function render() {
           <label class="table-search" style="font-size: 10px"
             >Hasta <input type="date" id="report-to" value="${escapeHtml(state.to)}" aria-label="Fecha final del período"
           /></label>
-          <button class="button button-primary button-compact" type="button" data-action="report-generate">
+          <button
+            class="button button-primary button-compact"
+            id="report-generate"
+            type="button"
+            data-action="report-generate"
+          >
             ${escapeHtml(viewInfo.action)}
           </button>
         </div>
@@ -71,12 +76,17 @@ export function render() {
 export default render;
 
 function bindListeners() {
-  if (listenersBound || typeof document === 'undefined') return;
-  listenersBound = true;
+  if (typeof document === 'undefined' || boundDocument === document) return;
+  boundDocument = document;
 
   document.addEventListener('click', (event) => {
     const root = event.target.closest?.('#reportes-view');
     if (!root) return;
+
+    if (event.target.closest?.('#report-generate, [data-action="report-generate"]')) {
+      generate();
+      return;
+    }
 
     const presetButton = event.target.closest?.('[data-period]');
     if (presetButton) {
@@ -87,10 +97,7 @@ function bindListeners() {
     const tabButton = event.target.closest?.('[data-report-tab]');
     if (tabButton) {
       selectTab(tabButton.dataset.reportTab);
-      return;
     }
-
-    if (event.target.closest?.('[data-action="report-generate"]')) generate();
   });
 
   document.addEventListener('change', (event) => {
@@ -99,39 +106,42 @@ function bindListeners() {
   });
 
   document.addEventListener('finance:data-changed', () => updateResults());
-  window.addEventListener('storage', (event) => {
-    if (
-      !event.key ||
-      event.key.startsWith('@erp-envelope:entries') ||
-      event.key.startsWith('@erp-envelope:accounts') ||
-      event.key === '@erp-settings'
-    ) {
-      updateResults();
-    }
-  });
+  if (boundWindow !== window) {
+    boundWindow = window;
+    window.addEventListener('storage', (event) => {
+      if (
+        !event.key ||
+        event.key.startsWith('@erp-envelope:entries') ||
+        event.key.startsWith('@erp-envelope:accounts') ||
+        event.key === '@erp-settings'
+      ) {
+        updateResults();
+      }
+    });
+  }
 }
 
-function generate() {
+export function generate() {
   const root = document.querySelector('#reportes-view');
   if (!root) return;
-  const from = String(root.querySelector('#report-from')?.value ?? state.from ?? '');
-  const to = String(root.querySelector('#report-to')?.value ?? state.to ?? '');
+  const from = String(root.querySelector('#report-from')?.value ?? '').trim();
+  const to = String(root.querySelector('#report-to')?.value ?? '').trim();
 
   if (!isValidDate(from) || !isValidDate(to)) {
     setFeedback('Selecciona una fecha inicial y una fecha final válidas para generar el reporte.');
     return;
   }
   if (from > to) {
-    setFeedback('Rango de fechas inválido: la fecha "Desde" no puede ser posterior a la fecha "Hasta".');
+    setFeedback("Rango de fechas inválido: 'Desde' no puede ser posterior a 'Hasta'.");
     return;
   }
 
   state.from = from;
   state.to = to;
   state.preset = detectPreset(from, to);
-  clearFeedback();
   syncToolbar();
   updateResults();
+  setFeedback('Reporte actualizado para el período seleccionado.', 'success');
 }
 
 function applyPreset(value) {
@@ -176,11 +186,15 @@ function syncToolbar() {
   if (count) count.textContent = String(countPosted(state.from, state.to));
 }
 
-function setFeedback(message) {
+function setFeedback(message, type = 'error') {
   const feedback = document.querySelector('#reportes-view #report-feedback');
   if (!feedback) return;
   feedback.textContent = message;
   feedback.hidden = !message;
+  feedback.setAttribute('role', type === 'error' ? 'alert' : 'status');
+  feedback.style.borderLeftColor = type === 'error' ? '#c76854' : '#2f9e6f';
+  feedback.style.background = type === 'error' ? '#fff7f5' : '#f3fbf7';
+  feedback.style.color = type === 'error' ? '#c76854' : '#247a55';
 }
 
 function clearFeedback() {
@@ -213,7 +227,6 @@ function renderPresetTabs() {
 function renderResults() {
   const data = buildReportData(state.from, state.to);
   const hasMovements = data.posted.length > 0;
-  const periodLabel = `${formatDate(state.from)} — ${formatDate(state.to)}`;
 
   return `
     <div class="metrics-grid" style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); width: 100%">
@@ -242,7 +255,7 @@ function renderResults() {
           >Flujo de Caja</button
         >
       </div>
-      <span class="period-label">Período: <strong>${escapeHtml(periodLabel)}</strong></span>
+      <span class="period-label" data-period-from="${escapeHtml(state.from)}" data-period-to="${escapeHtml(state.to)}">${renderPeriodLabel()}</span>
     </div>
 
     <section class="panel transactions-panel" id="report-resultado"${state.activeTab === 'resultado' ? '' : ' hidden'}>
@@ -259,7 +272,7 @@ function renderResults() {
           >Solo cuentas de tipo Ingreso o Gasto (se excluyen Activo, Pasivo y Patrimonio) y asientos en estado
           Contabilizada: se descartan Borrador, Pendiente, Aprobada y Revertida. </span
         >
-        <span class="period-label">${escapeHtml(periodLabel)}</span>
+        <span class="period-label" data-period-from="${escapeHtml(state.from)}" data-period-to="${escapeHtml(state.to)}">${renderPeriodLabel()}</span>
       </div>
     </section>
 
@@ -278,10 +291,16 @@ function renderResults() {
       }
       <div class="table-footer">
         <span>Mismo criterio es_efectivo que el Panel general · solo asientos Contabilizada.</span>
-        <span class="period-label">${escapeHtml(periodLabel)}</span>
+        <span class="period-label" data-period-from="${escapeHtml(state.from)}" data-period-to="${escapeHtml(state.to)}">${renderPeriodLabel()}</span>
       </div>
     </section>
   `;
+}
+
+function renderPeriodLabel() {
+  const pretty = `${formatDate(state.from)} — ${formatDate(state.to)}`;
+  const iso = `${state.from} — ${state.to}`;
+  return `Período: <strong>${escapeHtml(pretty)}</strong><span class="sr-only"> ${escapeHtml(iso)}</span>`;
 }
 
 function renderStatementContent(data, hasMovements) {
@@ -396,8 +415,26 @@ function renderMetricCard(label, id, value, iconClass, iconPath) {
   `;
 }
 
+function loadPostedEntries(from, to) {
+  const records = loadCollection('entries').records || [];
+  return records.filter((entry) => {
+    if (String(entry?.estado ?? '') !== ENTRY_STATE.CONTABILIZADA) return false;
+    const date = entryDate(entry);
+    return Boolean(date) && date >= from && date <= to;
+  });
+}
+
+function entryDate(entry) {
+  for (const key of ['fecha_contable', 'fecha', 'date', 'fechaContable']) {
+    const value = entry?.[key];
+    if (value instanceof Date && !Number.isNaN(value.getTime())) return value.toISOString().slice(0, 10);
+    if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}/.test(value)) return value.slice(0, 10);
+  }
+  return '';
+}
+
 function buildReportData(from, to) {
-  const posted = filterEntries({ fecha_desde: from, fecha_hasta: to, estado: ENTRY_STATE.CONTABILIZADA });
+  const posted = loadPostedEntries(from, to);
   const accountsById = new Map(
     loadCollection('accounts')
       .records.filter(Boolean)
@@ -495,7 +532,7 @@ function compareAccounts(left, right) {
 }
 
 function countPosted(from, to) {
-  return filterEntries({ fecha_desde: from, fecha_hasta: to, estado: ENTRY_STATE.CONTABILIZADA }).length;
+  return loadPostedEntries(from, to).length;
 }
 
 function resolveActivePeriod(settings) {
