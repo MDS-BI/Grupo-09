@@ -1,6 +1,6 @@
 import { loadCollection } from '../storage.js';
 import { ENTRY_STATE } from '../domain/entry.js';
-import { buildCashFlow } from '../services/report-service.js';
+
 import { filterEntries } from '../services/query-service.js';
 import { loadSettings } from '../services/settings-service.js';
 import { formatAmount } from '../utils/money.js';
@@ -24,7 +24,7 @@ export function render() {
   state.activeTab = 'resultado';
 
   return `
-    <section class="reportes-view" id="reportes-view" aria-label="Reportes financieros">
+    <section class="reportes-view" id="reportes-view" aria-label="Reportes financieros" style="width: 100%">
       <div class="page-heading">
         <div>
           <div class="eyebrow"><span class="eyebrow-line"></span> REPORTES FINANCIEROS</div>
@@ -114,15 +114,15 @@ function bindListeners() {
 function generate() {
   const root = document.querySelector('#reportes-view');
   if (!root) return;
-  const from = root.querySelector('#report-from')?.value || '';
-  const to = root.querySelector('#report-to')?.value || '';
+  const from = String(root.querySelector('#report-from')?.value ?? state.from ?? '');
+  const to = String(root.querySelector('#report-to')?.value ?? state.to ?? '');
 
   if (!isValidDate(from) || !isValidDate(to)) {
     setFeedback('Selecciona una fecha inicial y una fecha final válidas para generar el reporte.');
     return;
   }
   if (from > to) {
-    setFeedback('La fecha inicial no puede ser posterior a la fecha final. Se conserva el reporte anterior.');
+    setFeedback('Rango de fechas inválido: la fecha "Desde" no puede ser posterior a la fecha "Hasta".');
     return;
   }
 
@@ -216,7 +216,7 @@ function renderResults() {
   const periodLabel = `${formatDate(state.from)} — ${formatDate(state.to)}`;
 
   return `
-    <div class="metrics-grid" style="grid-template-columns: repeat(auto-fit, minmax(190px, 1fr))">
+    <div class="metrics-grid" style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); width: 100%">
       ${renderMetricCard('Ingresos totales', 'report-metric-ingresos', formatFixed(data.statement.ingresos), 'icon-green', '<path d="M4 16 10 10l4 4 6-7M14 7h6v6" />')}
       ${renderMetricCard('Gastos totales', 'report-metric-gastos', formatFixed(data.statement.gastos), 'icon-amber', '<path d="M4 8 10 14l4-4 6 7M14 17h6v-6" />')}
       ${renderMetricCard('Resultado neto', 'report-metric-resultado', formatFixed(data.statement.resultadoNeto), 'icon-blue', '<path d="M4 19V5m0 14h16M8 15l4-5 3 2 5-7" />')}
@@ -257,7 +257,7 @@ function renderResults() {
       <div class="table-footer">
         <span
           >Solo cuentas de tipo Ingreso o Gasto (se excluyen Activo, Pasivo y Patrimonio) y asientos en estado
-          Contabilizada: se descartan Borrador, Pendiente, Aprobada y Revertida.</span
+          Contabilizada: se descartan Borrador, Pendiente, Aprobada y Revertida. </span
         >
         <span class="period-label">${escapeHtml(periodLabel)}</span>
       </div>
@@ -397,7 +397,6 @@ function renderMetricCard(label, id, value, iconClass, iconPath) {
 }
 
 function buildReportData(from, to) {
-  const cashFlow = buildCashFlow({ from, to });
   const posted = filterEntries({ fecha_desde: from, fecha_hasta: to, estado: ENTRY_STATE.CONTABILIZADA });
   const accountsById = new Map(
     loadCollection('accounts')
@@ -449,10 +448,12 @@ function buildReportData(from, to) {
       ...row,
       entradas: round4(row.entradas),
       salidas: round4(row.salidas),
-      total: round4(row.entradas + row.salidas),
+      total: round4(row.entradas - row.salidas),
     }))
     .filter((row) => row.total !== 0)
     .sort(compareAccounts);
+
+  const cashFlow = round4(cashRows.reduce((total, row) => total + row.total, 0));
 
   return { statement, cashFlow, posted, statementRows, cashRows };
 }
