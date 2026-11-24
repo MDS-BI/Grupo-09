@@ -34,9 +34,10 @@ const APPROVAL_STEPS = [
   },
 ];
 
-const IMMUTABLE_STATES = [ENTRY_STATE.CONTABILIZADA, ENTRY_STATE.REVERTIDA];
-const IMMUTABLE_MESSAGE =
-  'Este asiento es inmutable: no se puede editar ni eliminar. Use una reversa para corregirlo.';
+const EDIT_LOCKED_MESSAGE = 'Solo se pueden editar asientos en estado Borrador.';
+const DELETE_LOCKED_MESSAGE = 'Solo se pueden eliminar asientos en estado Borrador.';
+const LOCKED_ACTION_STYLE =
+  'color: #aab3bf; background: #f2f4f7; border-color: #e6e9ee; opacity: 0.55; cursor: not-allowed;';
 const VARIABLE_ACTIONS = ['toggle-details', 'submit', 'approve', 'post', 'reverse', 'edit', 'delete'];
 
 let eventsBound = false;
@@ -88,7 +89,7 @@ export function render() {
         <span class="period-label"><span class="status-dot"></span>${entries.length} asientos en total</span>
       </div>
 
-      <div class="empty-state-panel" data-role="feedback" role="status" aria-live="polite" hidden></div>
+      <div class="empty-state-panel" data-role="feedback" role="status" aria-live="polite" style="margin-bottom: 14px;" hidden></div>
 
       <section class="panel transactions-panel">
         <div class="panel-heading transactions-heading">
@@ -211,9 +212,12 @@ function handleAction(action, button) {
   }
 
   if (action === 'edit') {
-    if (isImmutable(entry.estado)) {
-      notify(IMMUTABLE_MESSAGE, true);
+    if (entry.estado !== ENTRY_STATE.BORRADOR) {
+      notify(EDIT_LOCKED_MESSAGE, true);
       return;
+    }
+    if (typeof sessionStorage !== 'undefined') {
+      sessionStorage.setItem('editingEntryId', entry.id);
     }
     const nav = [...document.querySelectorAll('.nav-item')].find(
       (item) => item.dataset.view === 'nueva-transaccion',
@@ -278,8 +282,8 @@ function reversePostedEntry(entry, entries) {
 }
 
 function deleteDraftEntry(entry) {
-  if (isImmutable(entry.estado)) {
-    notify(IMMUTABLE_MESSAGE, true);
+  if (entry.estado !== ENTRY_STATE.BORRADOR) {
+    notify(DELETE_LOCKED_MESSAGE, true);
     return;
   }
 
@@ -309,9 +313,11 @@ function notify(message, isError = false) {
   const feedback = document.querySelector('#transacciones-view [data-role="feedback"]');
   if (feedback) {
     feedback.textContent = message;
-    feedback.hidden = false;
-    feedback.classList.toggle('is-error', isError);
-    feedback.style.borderLeft = isError ? '3px solid #c76854' : '3px solid #21875f';
+    feedback.hidden = !message;
+    feedback.classList.toggle('is-error', Boolean(message && isError));
+    feedback.style.cssText = message
+      ? `margin-bottom: 14px; padding: 10px 12px; border: 1px solid ${isError ? '#f0d3cd' : '#cfe6db'}; border-left: 3px solid ${isError ? '#c76854' : '#21875f'}; border-radius: 8px; background: ${isError ? '#fff6f4' : '#f3faf6'}; color: ${isError ? '#9b4c3b' : '#1f6b4b'}; font-size: 11px;`
+      : 'margin-bottom: 14px;';
   }
 
   const toast = document.querySelector('#toast');
@@ -366,7 +372,13 @@ function renderEntryRow(entry, entries, accounts, departments, user) {
   const hasReverse = entries.some(
     (item) => item.id_transaccion_revertida === entry.id && item.id !== entry.id,
   );
-  const immutable = isImmutable(entry.estado);
+  const lockedActions = entry.estado !== ENTRY_STATE.BORRADOR;
+  const editDisabled = lockedActions
+    ? ` disabled title="${EDIT_LOCKED_MESSAGE}" style="${LOCKED_ACTION_STYLE}"`
+    : ' title="Editar asiento en estado Borrador"';
+  const deleteDisabled = lockedActions
+    ? ` disabled title="${DELETE_LOCKED_MESSAGE}" style="${LOCKED_ACTION_STYLE}"`
+    : ' title="Eliminar asiento en estado Borrador"';
   const searchText = [
     entry.descripcion,
     entry.numero_documento,
@@ -405,8 +417,8 @@ function renderEntryRow(entry, entries, accounts, departments, user) {
         <div style="display: flex; flex-wrap: wrap; gap: 5px; justify-content: flex-end;">
           <button class="button button-secondary button-compact" type="button" data-action="toggle-details" data-entry-id="${id}" aria-expanded="false" aria-controls="${detailId}">Ver detalle</button>
           ${renderStepButtons(entry, user.role)}
-          <button class="button button-secondary button-compact" type="button" data-action="edit" data-entry-id="${id}"${immutable ? ` disabled title="${IMMUTABLE_MESSAGE}"` : ''}>Editar</button>
-          <button class="button button-secondary button-compact" type="button" data-action="delete" data-entry-id="${id}"${immutable ? ` disabled title="${IMMUTABLE_MESSAGE}"` : ''}>Eliminar</button>
+          <button class="button button-secondary button-compact" type="button" data-action="edit" data-entry-id="${id}"${editDisabled}>Editar</button>
+          <button class="button button-secondary button-compact" type="button" data-action="delete" data-entry-id="${id}"${deleteDisabled}>Eliminar</button>
           <button class="button ${entry.estado === ENTRY_STATE.CONTABILIZADA && !hasReverse ? 'button-primary' : 'button-secondary'} button-compact" type="button" data-action="reverse" data-entry-id="${id}"${entry.estado === ENTRY_STATE.CONTABILIZADA && !hasReverse ? '' : ` disabled title="${hasReverse ? 'Ya existe una reversa para este asiento' : 'Solo se pueden revertir asientos contabilizados'}"`}>Revertir</button>
         </div>
       </td>
@@ -551,10 +563,6 @@ function getCurrentUser() {
     users[0] ||
     { id: 'user-1', role: 'admin', name: 'Camila Méndez' }
   );
-}
-
-function isImmutable(state) {
-  return IMMUTABLE_STATES.includes(state);
 }
 
 function accountName(accounts, accountId) {
