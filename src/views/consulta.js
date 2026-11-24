@@ -24,6 +24,14 @@ const FILTER_KEYS = [
 
 const filters = Object.fromEntries(FILTER_KEYS.map((key) => [key, '']));
 
+const DATE_RANGE_MESSAGE = "La fecha 'Desde' no puede ser posterior a la fecha 'Hasta'";
+const FULL_WIDTH_STYLE = 'width: 100%; box-sizing: border-box';
+const FILTER_GRID_STYLE = `display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; ${FULL_WIDTH_STYLE}`;
+const FIELD_LABEL_STYLE =
+  "display: block; margin-bottom: 6px; color: #667386; font: 700 10px 'DM Sans', sans-serif; letter-spacing: 0.3px";
+const FIELD_CONTROL_STYLE = `height: 36px; padding: 0 10px; border: 1px solid #e1e6ee; border-radius: 7px; background: #fff; color: #344054; font: 500 11px 'DM Sans', sans-serif; ${FULL_WIDTH_STYLE}`;
+const DATE_WARNING_STYLE = `margin-top: 12px; padding: 10px 12px; border: 1px solid #f1c9c9; border-left: 3px solid #d64545; border-radius: 7px; background: #fff8f8; color: #a12d2d; font: 600 11px 'DM Sans', sans-serif; ${FULL_WIDTH_STYLE}`;
+
 export function render() {
   ensureListeners();
   FILTER_KEYS.forEach((key) => {
@@ -34,7 +42,7 @@ export function render() {
   const results = runQuery(catalog);
 
   return `
-    <section class="consulta-view" id="consulta-view">
+    <section class="consulta-view" id="consulta-view" style="${FULL_WIDTH_STYLE}">
       <div class="page-heading">
         <div>
           <div class="eyebrow"><span class="eyebrow-line"></span> CONSULTA HISTÓRICA</div>
@@ -48,44 +56,45 @@ export function render() {
         </div>
       </div>
 
-      <section class="panel query-filters" id="query-filters" aria-label="Filtros de consulta">
+      <section class="panel query-filters" id="query-filters" aria-label="Filtros de consulta" style="${FULL_WIDTH_STYLE}">
         <div class="panel-heading">
           <div>
             <h2>Filtros de búsqueda</h2>
             <p>Combina varios criterios para obtener solo los asientos que cumplen todos.</p>
           </div>
         </div>
-        <div class="query-filter-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px">
-          <label class="query-field">
-            <span>Buscar</span>
+        <div class="query-filter-grid" style="${FILTER_GRID_STYLE}">
+          <div class="query-field">
+            <label for="query-search" style="${FIELD_LABEL_STYLE}">Buscar</label>
             <input id="query-search" name="busqueda_texto" data-filter="busqueda_texto" type="search"
-              placeholder="Descripción, documento, cuenta o glosa" value="${escapeHtml(filters.busqueda_texto)}" />
-          </label>
-          <label class="query-field">
-            <span>Desde</span>
+              placeholder="Descripción, documento, cuenta o glosa" value="${escapeHtml(filters.busqueda_texto)}"
+              style="${FIELD_CONTROL_STYLE}" />
+          </div>
+          <div class="query-field">
+            <label for="query-desde" style="${FIELD_LABEL_STYLE}">Desde</label>
             <input id="query-desde" name="fecha_desde" data-filter="fecha_desde" type="date"
-              value="${escapeHtml(filters.fecha_desde)}" />
-          </label>
-          <label class="query-field">
-            <span>Hasta</span>
+              value="${escapeHtml(filters.fecha_desde)}" style="${FIELD_CONTROL_STYLE}" />
+          </div>
+          <div class="query-field">
+            <label for="query-hasta" style="${FIELD_LABEL_STYLE}">Hasta</label>
             <input id="query-hasta" name="fecha_hasta" data-filter="fecha_hasta" type="date"
-              value="${escapeHtml(filters.fecha_hasta)}" />
-          </label>
-          <label class="query-field">
-            <span>Cuenta contable</span>
-            <select id="query-cuenta" name="id_cuenta" data-filter="id_cuenta">
+              value="${escapeHtml(filters.fecha_hasta)}" style="${FIELD_CONTROL_STYLE}" />
+          </div>
+          <div class="query-field">
+            <label for="query-cuenta" style="${FIELD_LABEL_STYLE}">Cuenta contable</label>
+            <select id="query-cuenta" name="id_cuenta" data-filter="id_cuenta" style="${FIELD_CONTROL_STYLE}">
               ${renderOptions(catalog.accounts, filters.id_cuenta, 'Todas las cuentas')}
             </select>
-          </label>
-          <label class="query-field">
-            <span>Centro de costo</span>
-            <select id="query-centro" name="id_departamento" data-filter="id_departamento">
+          </div>
+          <div class="query-field">
+            <label for="query-centro" style="${FIELD_LABEL_STYLE}">Centro de costo</label>
+            <select id="query-centro" name="id_departamento" data-filter="id_departamento" style="${FIELD_CONTROL_STYLE}">
               ${renderOptions(catalog.departments, filters.id_departamento, 'Todos los centros de costo')}
             </select>
-          </label>
-          <label class="query-field">
-            <span>Estado del asiento</span>
-            <select id="query-estado" name="estado" data-filter="estado">
+          </div>
+          <div class="query-field">
+            <label for="query-estado" style="${FIELD_LABEL_STYLE}">Estado del asiento</label>
+            <select id="query-estado" name="estado" data-filter="estado" style="${FIELD_CONTROL_STYLE}">
               <option value="">Todos los estados</option>
               ${Object.values(ENTRY_STATE)
                 .map(
@@ -94,11 +103,12 @@ export function render() {
                 )
                 .join('')}
             </select>
-          </label>
+          </div>
         </div>
+        <div class="query-date-warning" id="query-date-warning" role="alert" style="${DATE_WARNING_STYLE}${isInvalidDateRange() ? '' : '; display: none'}"${isInvalidDateRange() ? '' : ' hidden'}>${DATE_RANGE_MESSAGE}</div>
       </section>
 
-      <div id="query-results">${renderResults(results, catalog)}</div>
+      <div id="query-results" style="${FULL_WIDTH_STYLE}">${renderResults(results, catalog)}</div>
     </section>
   `;
 }
@@ -155,20 +165,55 @@ function clearFilters() {
   updateResults();
 }
 
+function isInvalidDateRange() {
+  return Boolean(
+    filters.fecha_desde && filters.fecha_hasta && filters.fecha_desde > filters.fecha_hasta,
+  );
+}
+
+function syncDateRangeWarning() {
+  const invalid = isInvalidDateRange();
+  const warning = document.querySelector('#consulta-view #query-date-warning');
+  if (warning) {
+    warning.hidden = !invalid;
+    warning.style.display = invalid ? 'block' : 'none';
+    warning.textContent = DATE_RANGE_MESSAGE;
+  }
+  ['query-desde', 'query-hasta'].forEach((id) => {
+    document.querySelector(`#consulta-view #${id}`)?.setAttribute('aria-invalid', String(invalid));
+  });
+}
+
+function selectedLines(entry) {
+  return (entry?.detalles || []).filter((line) => {
+    if (!line) return false;
+    if (filters.id_cuenta && line.id_cuenta !== filters.id_cuenta) return false;
+    if (filters.id_departamento && line.id_departamento !== filters.id_departamento) return false;
+    return true;
+  });
+}
+
 function updateResults() {
   const container = document.querySelector('#consulta-view #query-results');
   if (!container) return;
+  syncDateRangeWarning();
   const catalog = buildCatalog();
   container.innerHTML = renderResults(runQuery(catalog), catalog);
 }
 
 function runQuery(catalog) {
+  if (isInvalidDateRange()) return [];
+
   let results;
   try {
     results = filterEntries({ ...filters });
   } catch {
     results = loadCollection('entries').records;
     results = results.filter((entry) => matchesFiltersLocally(entry));
+  }
+
+  if (!filters.estado) {
+    results = results.filter((entry) => entry.estado !== ENTRY_STATE.REVERTIDA);
   }
 
   if (filters.busqueda_texto) {
@@ -182,6 +227,7 @@ function runQuery(catalog) {
 
 function matchesFiltersLocally(entry) {
   const lines = entry.detalles || [];
+  if (!filters.estado && entry.estado === ENTRY_STATE.REVERTIDA) return false;
   if (filters.fecha_desde && String(entry.fecha_contable || '') < filters.fecha_desde) return false;
   if (filters.fecha_hasta && String(entry.fecha_contable || '') > filters.fecha_hasta) return false;
   if (filters.estado && entry.estado !== filters.estado) return false;
@@ -205,7 +251,7 @@ function matchesMovementText(entry, query, catalog) {
     entry.descripcion,
     entry.numero_documento,
     entry.tipo_documento,
-    ...(entry.detalles || []).flatMap((line) => [
+    ...selectedLines(entry).flatMap((line) => [
       line.glosa,
       line.id_cuenta,
       line.id_departamento,
@@ -224,33 +270,33 @@ function renderResults(results, catalog) {
   const hasResults = results.length > 0;
 
   return `
-    <div class="query-summary" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; margin: 14px 0">
-      <div class="panel" style="padding: 14px">
+    <div class="query-summary" style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin: 14px 0; ${FULL_WIDTH_STYLE}">
+      <div class="panel" style="padding: 14px; ${FULL_WIDTH_STYLE}">
         <span class="eyebrow">RESULTADOS</span>
         <strong id="query-count" style="display: block; margin-top: 6px; font: 700 22px Manrope, sans-serif">${results.length}</strong>
         <span style="font-size: 10px; color: #8792a2">asientos encontrados</span>
       </div>
-      <div class="panel" style="padding: 14px">
+      <div class="panel" style="padding: 14px; ${FULL_WIDTH_STYLE}">
         <span class="eyebrow">TOTAL DEBE</span>
         <strong id="query-total-debe" style="display: block; margin-top: 6px; font: 700 22px Manrope, sans-serif">${escapeHtml(formatCurrency(totals.debe))}</strong>
         <span style="font-size: 10px; color: #8792a2">suma de movimientos</span>
       </div>
-      <div class="panel" style="padding: 14px">
+      <div class="panel" style="padding: 14px; ${FULL_WIDTH_STYLE}">
         <span class="eyebrow">TOTAL HABER</span>
         <strong id="query-total-haber" style="display: block; margin-top: 6px; font: 700 22px Manrope, sans-serif">${escapeHtml(formatCurrency(totals.haber))}</strong>
         <span style="font-size: 10px; color: #8792a2">suma de movimientos</span>
       </div>
     </div>
 
-    <section class="panel transactions-panel">
+    <section class="panel transactions-panel" style="${FULL_WIDTH_STYLE}">
       <div class="panel-heading">
         <div>
           <h2>Resultados de la consulta</h2>
           <p>Asientos y movimientos registrados en el almacenamiento local</p>
         </div>
       </div>
-      <div class="table-wrap">
-        <table>
+      <div class="table-wrap" style="${FULL_WIDTH_STYLE}">
+        <table style="${FULL_WIDTH_STYLE}">
           <thead>
             <tr>
               <th>FECHA</th>
@@ -288,7 +334,7 @@ function renderResults(results, catalog) {
 }
 
 function renderEntryRow(entry, catalog) {
-  const lines = entry.detalles || [];
+  const lines = selectedLines(entry);
   const debe = sumLines(lines, 'monto_debe');
   const haber = sumLines(lines, 'monto_haber');
   const movements = lines.length
@@ -328,8 +374,9 @@ function renderStatePill(state) {
 function sumTotals(entries) {
   return entries.reduce(
     (totals, entry) => {
-      totals.debe += sumLines(entry.detalles || [], 'monto_debe');
-      totals.haber += sumLines(entry.detalles || [], 'monto_haber');
+      const lines = selectedLines(entry);
+      totals.debe += sumLines(lines, 'monto_debe');
+      totals.haber += sumLines(lines, 'monto_haber');
       return totals;
     },
     { debe: 0, haber: 0 },
@@ -337,7 +384,8 @@ function sumTotals(entries) {
 }
 
 function sumLines(lines, field) {
-  return lines.reduce((sum, line) => sum + (Number(line[field]) || 0), 0);
+  const total = lines.reduce((sum, line) => sum + (Number(line[field]) || 0), 0);
+  return Math.round(total * 10000) / 10000;
 }
 
 function buildCatalog() {
