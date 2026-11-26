@@ -14,9 +14,23 @@ export const viewInfo = {
   action: 'Nueva cuenta contable',
 }
 
+function getNatureSuggestion(tipo) {
+  const sugerencias = {
+    Activo: 'Debe',
+    Pasivo: 'Haber',
+    Patrimonio: 'Haber',
+    Ingreso: 'Haber',
+    Gasto: 'Debe',
+  }
+  return sugerencias[tipo] || 'Debe'
+}
+
 function renderAccountForm(account = {}, allAccounts = []) {
   const isEditing = editingId !== null
   const acc = allAccounts.find((a) => a.id === account.id) || account
+  const tipo = acc.tipo || 'Activo'
+  const naturaleza = acc.naturaleza || getNatureSuggestion(tipo)
+
   const parentOptions = allAccounts
     .filter((a) => a.id !== account.id)
     .map((a) => {
@@ -24,139 +38,182 @@ function renderAccountForm(account = {}, allAccounts = []) {
       return `<option value="${a.id}" ${selected}>${a.codigo} - ${a.nombre}</option>`
     })
     .join('')
+
   const tipoOptions = `
-    <option value="Activo" ${acc.tipo === 'Activo' ? 'selected' : ''}>Activo</option>
-    <option value="Pasivo" ${acc.tipo === 'Pasivo' ? 'selected' : ''}>Pasivo</option>
-    <option value="Patrimonio" ${acc.tipo === 'Patrimonio' ? 'selected' : ''}>Patrimonio</option>
-    <option value="Ingreso" ${acc.tipo === 'Ingreso' ? 'selected' : ''}>Ingreso</option>
-    <option value="Gasto" ${acc.tipo === 'Gasto' ? 'selected' : ''}>Gasto</option>
+    <option value="Activo" ${tipo === 'Activo' ? 'selected' : ''}>Activo</option>
+    <option value="Pasivo" ${tipo === 'Pasivo' ? 'selected' : ''}>Pasivo</option>
+    <option value="Patrimonio" ${tipo === 'Patrimonio' ? 'selected' : ''}>Patrimonio</option>
+    <option value="Ingreso" ${tipo === 'Ingreso' ? 'selected' : ''}>Ingreso</option>
+    <option value="Gasto" ${tipo === 'Gasto' ? 'selected' : ''}>Gasto</option>
   `
+
   const naturalezaOptions = `
-    <option value="Debe" ${acc.naturaleza === 'Debe' ? 'selected' : ''}>Debe</option>
-    <option value="Haber" ${acc.naturaleza === 'Haber' ? 'selected' : ''}>Haber</option>
+    <option value="Debe" ${naturaleza === 'Debe' ? 'selected' : ''}>Debe</option>
+    <option value="Haber" ${naturaleza === 'Haber' ? 'selected' : ''}>Haber</option>
   `
+
   const activaOptions = `
     <option value="true" ${acc.activa === true ? 'selected' : ''}>Sí</option>
     <option value="false" ${acc.activa === false ? 'selected' : ''}>No</option>
   `
 
   return `
-    <div class="account-form-card" style="max-width: 500px; margin: 0 auto">
-      <h3 style="margin: 0 0 12px; font: 700 13px Manrope, sans-serif; color: #263244">
-        ${isEditing ? 'Editar cuenta contable' : 'Nueva cuenta contable'}
-      </h3>
-      <form id="account-form">
-        <div class="form-group">
-          <label for="account-codigo">Código de cuenta</label>
-          <input type="text" id="account-codigo"
-            value="${acc.codigo || ''}"
-            placeholder="1100"
-            required />
+    <section class="accounts-view">
+      <div class="panel-heading">
+        <h2>— CATÁLOGO CONTABLE</h2>
+        <p>Plan de cuentas</p>
+      </div>
+
+      <div class="account-form-section">
+        <div class="account-card">
+          <h3 style="margin: 0 0 12px; font: 700 13px Manrope, sans-serif; color: #263244">
+            ${isEditing ? 'Editar cuenta contable' : 'Nueva cuenta contable'}
+          </h3>
+          <form id="account-form">
+            <div class="form-grid">
+              <div class="form-group">
+                <label for="account-codigo">Código de cuenta</label>
+                <input type="text" id="account-codigo"
+                  value="${acc.codigo || ''}"
+                  placeholder="1100"
+                  required />
+              </div>
+              <div class="form-group">
+                <label for="account-nombre">Nombre de la cuenta</label>
+                <input type="text" id="account-nombre"
+                  value="${acc.nombre || ''}"
+                  placeholder="Caja y bancos"
+                  required />
+              </div>
+              <div class="form-group">
+                <label for="account-tipo">Tipo</label>
+                <select id="account-tipo">${tipoOptions}</select>
+              </div>
+              <div class="form-group">
+                <label for="account-naturaleza">Naturaleza</label>
+                <select id="account-naturaleza">${naturalezaOptions}</select>
+              </div>
+              <div class="form-group">
+                <label for="account-padre">Cuenta padre</label>
+                <select id="account-padre">
+                  <option value="">Ninguna</option>
+                  ${parentOptions}
+                </select>
+              </div>
+              <div class="form-group">
+                <label for="account-activa">Activa</label>
+                <select id="account-activa">${activaOptions}</select>
+              </div>
+            </div>
+            <div style="margin-top: 16px; display: flex; justify-content: flex-end; gap: 8px">
+              <button type="button" class="button button-secondary" id="cancel-account">Cancelar</button>
+              <button type="submit" class="button button-primary" id="save-account">${isEditing ? 'Actualizar' : 'Guardar'}</button>
+            </div>
+          </form>
         </div>
-        <div class="form-group">
-          <label for="account-nombre">Nombre de la cuenta</label>
-          <input type="text" id="account-nombre"
-            value="${acc.nombre || ''}"
-            placeholder="Caja y bancos"
-            required />
-        </div>
-        <div class="form-group">
-          <label for="account-tipo">Tipo</label>
-          <select id="account-tipo">${tipoOptions}</select>
-        </div>
-        <div class="form-group">
-          <label for="account-naturaleza">Naturaleza</label>
-          <select id="account-naturaleza">${naturalezaOptions}</select>
-        </div>
-        <div class="form-group">
-          <label for="account-padre">Cuenta padre</label>
-          <select id="account-padre">
-            <option value="">Ninguna</option>
-            ${parentOptions}
+      </div>
+
+      <div class="account-list-section">
+        <h3 style="margin: 0 0 12px; font: 700 13px Manrope, sans-serif; color: #263244">Cuentas registradas</h3>
+        <div class="list-filters">
+          <input type="text" id="buscador-cuentas" placeholder="Buscar por código o nombre" style="flex: 1; padding: 8px 12px; border: 1px solid #d0d5dd; border-radius: 6px; font-size: 13px">
+          <select id="filtro-tipo" style="margin-left: 8px; padding: 8px 12px; border: 1px solid #d0d5dd; border-radius: 6px; font-size: 13px">
+            <option value="">Todos los tipos</option>
+            <option value="Activo">Activo</option>
+            <option value="Pasivo">Pasivo</option>
+            <option value="Patrimonio">Patrimonio</option>
+            <option value="Ingreso">Ingreso</option>
+            <option value="Gasto">Gasto</option>
+          </select>
+          <select id="filtro-estado">
+            <option value="">Todos los estados</option>
+            <option value="activa">Activas</option>
+            <option value="inactiva">Inactivas</option>
           </select>
         </div>
-        <div class="form-group">
-          <label for="account-activa">Activa</label>
-          <select id="account-activa">${activaOptions}</select>
-        </div>
-        <div style="margin-top: 16px; display: flex; gap: 8px">
-          <button type="button" class="button button-secondary" id="cancel-account">Cancelar</button>
-          <button type="submit" class="button button-primary" id="save-account">${isEditing ? 'Actualizar' : 'Guardar'}</button>
-        </div>
-      </form>
-    </div>
+        <div id="account-list">${renderAccountList(allAccounts)}</div>
+      </div>
+    </section>
   `
 }
 
 function renderAccountList(accounts) {
-  if (accounts.length === 0) {
+  const accountsFilter = accounts || []
+
+  if (accountsFilter.length === 0) {
     return `<p style="text-align: center; color: #777; padding: 20px">No hay cuentas registradas</p>`
   }
 
   let html = ''
-  accounts.forEach((account) => {
+  accountsFilter.forEach((account) => {
     const integrity = checkAccountIntegrity(account.id)
 
-    const padreCuenta = accounts.find((a) => a.id === account.id_cuenta_padre)
+    const padreCuenta = accountsFilter.find((a) => a.id === account.id_cuenta_padre)
     const padreNombre = padreCuenta ? padreCuenta.nombre : 'Ninguna'
+
+    const tipoBadge = `
+      <span class="badge badge-tipo ${account.tipo.toLowerCase()}" title="${account.tipo}">${account.tipo}</span>
+    `
+    const naturalezaBadge = `
+      <span class="badge badge-naturaleza ${account.naturaleza.toLowerCase()}" title="${account.naturaleza}">${account.naturaleza}</span>
+    `
+    const estadoBadge = `
+      <span class="badge badge-estado ${account.activa === true ? 'badge-activo' : 'badge-inactivo'}" title="${account.activa === true ? 'Activa' : 'Inactiva'}">${account.activa === true ? 'Activa' : 'Inactiva'}</span>
+    `
 
     const canDelete = integrity.allowed
     const deleteBtn = canDelete
       ? `<button type="button" class="text-link" data-action="delete" data-account-id="${account.id}">Eliminar</button>`
-      : `<button type="button" class="text-link danger" data-action="desactivar" data-account-id="${account.id}">Desactivar cuenta</button>`
+      : `<button type="button" class="text-link danger" data-action="desactivar" data-account-id="${account.id}">Desactivar</button>`
+
+    const editBtn = `<button type="button" class="text-link" data-action="edit" data-account-id="${account.id}">Editar</button>`
+
+    const activateBtn = account.activa === false
+      ? `<button type="button" class="text-link success" data-action="activar" data-account-id="${account.id}">Activar</button>`
+      : ''
+
+    const desactivateBtn = account.activa === true
+      ? `<button type="button" class="text-link danger" data-action="desactivar" data-account-id="${account.id}">Desactivar</button>`
+      : ''
 
     html += `
-      <div style="border: 1px solid #e0e7ff; border-radius: 8px; padding: 12px; margin: 8px 0; background: #f8fbff">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px">
-          <span style="font-weight: 500; color: #1a1a2e;">${account.nombre}</span>
-          <strong>${account.codigo}</strong>
+      <div style="border: 1px solid #e0e7ff; border-radius: 8px; padding: 16px; margin: 8px 0; background: #f8fbff; display: grid; grid-template-columns: 1fr auto; gap: 12px; align-items: start">
+        <div style="grid-column: 1 / -1">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px">
+            <h4 style="font-weight: 500; color: #1a1a2e; margin: 0; font-size: 14px">${account.nombre}</h4>
+            <div style="display: flex; gap: 4px;">
+              ${tipoBadge}
+              ${naturalezaBadge}
+              ${estadoBadge}
+            </div>
+          </div>
+          <div style="font-size: 12px; color: #666; margin-bottom: 12px">
+            <span>Código: ${account.codigo}</span>
+            <span style="margin-left: 12px">Tipo: ${account.tipo}</span>
+            <span style="margin-left: 12px">Naturaleza: ${account.naturaleza}</span>
+            <span style="margin-left: 12px">Padre: ${padreNombre}</span>
+            <span style="margin-left: 12px">Estado: ${account.activa === true ? 'Activa' : 'Inactiva'}</span>
+          </div>
         </div>
-        <div style="font-size: 11px; color: #666">
-          <span>${account.tipo} • ${account.naturaleza}</span>
-          <span style="margin-left: 12px">Padre: ${padreNombre}</span>
-          <span style="margin-left: 12px">Estado: ${account.activa === true ? 'Activa' : 'Inactiva'}</span>
-        </div>
-        <div style="display: flex; gap: 8px; margin-top: 8px">
-          <button type="button" class="text-link" data-action="edit" data-account-id="${account.id}">Editar</button>
+        <div style="grid-column: 2 / 3; align-self: center; justify-self: end; white-space: nowrap">
+          ${activateBtn}
+          ${desactivateBtn}
+          ${editBtn}
           ${deleteBtn}
         </div>
-        ${!canDelete ? `<span style="font-size: 8px; color: #d98260; margin-top: 4px;">${integrity.reason || 'No se puede eliminar'}</span>` : ''}
+        ${!canDelete ? `<div style="margin-top: 8px; font-size: 8px; color: #d98260; align-self: center; justify-self: end; width: 100%;">${integrity.reason || 'No se puede eliminar'}</div>` : ''}
       </div>
     `
   })
 
-  return `<div style="max-height: 400px; overflow-y: auto;">${html}</div>`
-}
-
-function renderView(accounts) {
-  const editingAccount = editingId !== null
-    ? accounts.find((a) => a.id === editingId) || {}
-    : {}
-
-  return `
-    <section class="accounts-view">
-      <div class="panel-heading">
-        <h2>Plan de cuentas</h2>
-        <p>Catálogo de cuentas contables</p>
-      </div>
-
-      <div class="account-form-section" style="max-width: 600px; margin: 20px 0">
-        ${renderAccountForm(editingAccount, accounts)}
-      </div>
-
-      <div class="account-list-section" style="max-width: 600px; margin: 0 auto">
-        <h3 style="margin: 0 0 12px; font: 700 13px Manrope, sans-serif; color: #263244">Cuentas registradas</h3>
-        ${renderAccountList(accounts)}
-      </div>
-    </section>
-  `
+  return `<div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 16px;">${html}</div>`
 }
 
 export function render() {
   const accounts = loadCollection('accounts').records
   editingId = null
   queueMicrotask(bindViewListeners)
-  return renderView(accounts)
+  return render(accounts)
 }
 
 function refreshView() {
@@ -164,7 +221,7 @@ function refreshView() {
   if (!currentView) return
 
   const container = document.createElement('div')
-  container.innerHTML = renderView(loadCollection('accounts').records)
+  container.innerHTML = render(loadCollection('accounts').records)
   currentView.replaceWith(container.firstElementChild)
   bindViewListeners()
 }
@@ -187,6 +244,154 @@ function bindViewListeners() {
 
 class ValidationError extends Error {}
 
+function saveToAudit(action, accountData) {
+  let auditLogs = JSON.parse(localStorage.getItem('accountAuditLogs') || '[]')
+  auditLogs.push({
+    id: Date.now(),
+    action,
+    timestamp: new Date().toISOString(),
+    account: {
+      id: accountData.id,
+      codigo: accountData.codigo,
+      nombre: accountData.nombre,
+      tipo: accountData.tipo,
+      naturaleza: accountData.naturaleza,
+    }
+  })
+  // Keep only last 50 logs
+  if (auditLogs.length > 50) auditLogs = auditLogs.slice(-50)
+  localStorage.setItem('accountAuditLogs', JSON.stringify(auditLogs))
+}
+
+function suggestNatureFromType() {
+  const tipoSelect = document.querySelector('#account-tipo')
+  const naturalezaSelect = document.querySelector('#account-naturaleza')
+  if (!tipoSelect || !naturalezaSelect) return
+
+  tipoSelect.addEventListener('change', (e) => {
+    const sugerida = getNatureSuggestion(e.target.value)
+    naturalezaSelect.value = sugerida
+  })
+}
+
+function bindAccountListListeners() {
+  const buscador = document.querySelector('#buscador-cuentas')
+  const filtroTipo = document.querySelector('#filtro-tipo')
+  const filtroEstado = document.querySelector('#filtro-estado')
+
+  // Auto-suggest nature based on type
+  suggestNatureFromType()
+
+  // Apply filters and search
+  function applyFilters() {
+    const term = (buscador || {}).value.trim().toLowerCase() || ''
+    const tipoSel = (filtroTipo || {}).value || ''
+    const estadoSel = (filtroEstado || {}).value || ''
+
+    let filtered = loadCollection('accounts').records
+
+    if (tipoSel) {
+      filtered = filtered.filter(a => a.tipo === tipoSel)
+    }
+    if (estadoSel) {
+      filtered = filtered.filter(a => a.activa === (estadoSel === 'activa'))
+    }
+    if (term) {
+      filtered = filtered.filter(a =>
+        a.codigo.toLowerCase().includes(term) || a.nombre.toLowerCase().includes(term)
+      )
+    }
+
+    const listDiv = document.querySelector('#account-list')
+    if (listDiv) {
+      listDiv.innerHTML = renderAccountList(filtered)
+    }
+    bindAccountListListeners()
+  }
+
+  if (buscador) buscador.addEventListener('input', applyFilters)
+  if (filtroTipo) filtroTipo.addEventListener('change', applyFilters)
+  if (filtroEstado) filtroEstado.addEventListener('change', applyFilters)
+
+  document
+    .querySelectorAll(
+      '.accounts-view [data-action="edit"], .accounts-view [data-action="delete"], .accounts-view [data-action="desactivar"], .accounts-view [data-action="activar"]'
+    )
+    .forEach((btn) => {
+      if (btn.dataset.bound) return
+      btn.dataset.bound = 'true'
+
+      btn.addEventListener('click', () => {
+        const accountId = btn.dataset.accountId
+        const action = btn.dataset.action
+
+        if (action === 'edit') {
+          startEditing(accountId)
+          return
+        }
+
+        if (action === 'activar') {
+          try {
+            const result = updateAccount(accountId, { activa: true })
+            if (!result.success) {
+              showError(result.error || 'No se pudo activar la cuenta')
+              return
+            }
+            showToast('Cuenta activada correctamente')
+            saveToAudit('activar', { id: accountId, codigo: '', nombre: '', tipo: '', naturaleza: '' })
+            refreshView()
+          } catch (error) {
+            showError(`No se pudo activar la cuenta: ${getErrorMessage(error)}`)
+          }
+          return
+        }
+
+        if (action === 'desactivar') {
+          try {
+            const result = updateAccount(accountId, { activa: false })
+            if (!result.success) {
+              showError(result.error || 'No se pudo desactivar la cuenta')
+              return
+            }
+            showToast('Cuenta desactivada correctamente')
+            saveToAudit('desactivar', { id: accountId, codigo: '', nombre: '', tipo: '', naturaleza: '' })
+            refreshView()
+          } catch (error) {
+            showError(`No se pudo desactivar la cuenta: ${getErrorMessage(error)}`)
+          }
+          return
+        }
+
+        // Delete action - check for associated movements
+        if (action === 'delete') {
+          try {
+            const journals = JSON.parse(localStorage.getItem('journals') || '[]')
+            const hasMovements = journals.some(j =>
+              j.lines.some(line => line.id_cuenta === accountId)
+            )
+
+            if (hasMovements) {
+              showError('No se puede eliminar esta cuenta porque tiene movimientos asociados en los asientos contables. Desactive la cuenta en su lugar.')
+              return
+            }
+
+            const result = deleteAccountService(accountId)
+            if (!result.success) {
+              showError(result.error || 'No se pudo eliminar la cuenta')
+              return
+            }
+            showToast('Cuenta eliminada correctamente')
+            saveToAudit('eliminar', { id: accountId, codigo: '', nombre: '', tipo: '', naturaleza: '' })
+            refreshView()
+          } catch (error) {
+            showError(`No se pudo eliminar la cuenta: ${getErrorMessage(error)}`)
+          }
+          return
+        }
+      })
+    })
+}
+
 function handleFormSubmit(event) {
   event.preventDefault()
 
@@ -202,6 +407,15 @@ function handleFormSubmit(event) {
   const currentAccount = editingId
     ? existingAccounts.find((a) => a.id === editingId)
     : null
+
+  // Auto-suggest nature if still default
+  const naturalezaInput = form.querySelector('#account-naturaleza')
+  if (naturalezaInput && !currentAccount) {
+    const sugerida = getNatureSuggestion(tipo)
+    if (naturalezaInput.value === 'Debe' || naturalezaInput.value === 'Haber') {
+      naturalezaInput.value = sugerida
+    }
+  }
 
   const account = {
     codigo,
@@ -250,6 +464,10 @@ function handleFormSubmit(event) {
     editingId = null
     clearError()
     refreshView()
+
+    // Save to audit log
+    const savedAccount = { ...account, id: editingId || Date.now() }
+    saveToAudit(editingId !== null ? 'editar' : 'crear', savedAccount)
   } catch (error) {
     showError(error instanceof ValidationError
       ? error.message
@@ -323,47 +541,6 @@ function showError(message) {
 
 function getErrorMessage(error) {
   return error instanceof Error ? error.message : String(error)
-}
-
-function bindAccountListListeners() {
-  document
-    .querySelectorAll(
-      '.accounts-view [data-action="edit"], .accounts-view [data-action="delete"], .accounts-view [data-action="desactivar"]'
-    )
-    .forEach((btn) => {
-      if (btn.dataset.bound) return
-      btn.dataset.bound = 'true'
-
-      btn.addEventListener('click', () => {
-        const accountId = btn.dataset.accountId
-        const action = btn.dataset.action
-
-        if (action === 'edit') {
-          startEditing(accountId)
-          return
-        }
-
-        const isDelete = action === 'delete'
-
-        try {
-          const result = isDelete
-            ? deleteAccountService(accountId)
-            : updateAccount(accountId, { activa: false })
-
-          if (!result.success) {
-            showError(result.error || 'No se pudo completar la operación')
-            return
-          }
-
-          showToast(isDelete ? 'Cuenta eliminada correctamente' : 'Cuenta desactivada correctamente')
-          refreshView()
-        } catch (error) {
-          showError(
-            `No se pudo ${isDelete ? 'eliminar' : 'desactivar'} la cuenta: ${getErrorMessage(error)}`
-          )
-        }
-      })
-    })
 }
 
 function showToast(message) {
