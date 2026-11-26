@@ -53,11 +53,48 @@ function renderAccountForm(account = {}, allAccounts = []) {
   `
 
   const activaOptions = `
-    <option value="true" ${acc.activa === true ? 'selected' : ''}>Sí</option>
+    <option value="true" ${acc.activa !== false ? 'selected' : ''}>Sí</option>
     <option value="false" ${acc.activa === false ? 'selected' : ''}>No</option>
   `
 
   return `
+        <style>
+      .accounts-view { display: flex; flex-direction: column; gap: 20px; width: 100%; }
+      .accounts-view .panel-heading h2 { margin: 0 0 4px; font: 700 11px/1.2 Manrope, sans-serif; letter-spacing: 0.08em; color: #64748b; text-transform: uppercase; }
+      .accounts-view .panel-heading p { margin: 0; font: 800 24px/1.2 Manrope, sans-serif; color: #0f172a; }
+      .accounts-view .account-card,
+      .accounts-view .account-list-section { background: #ffffff; border: 1px solid #e2e8f0; border-radius: 14px; padding: 20px 24px; box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04); }
+      .accounts-view .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; }
+      .accounts-view .form-group { display: flex; flex-direction: column; gap: 6px; }
+      .accounts-view .form-group label { font: 600 12px/1.2 Manrope, sans-serif; color: #334155; }
+      .accounts-view .form-group input,
+      .accounts-view .form-group select,
+      .accounts-view .list-filters input,
+      .accounts-view .list-filters select { height: 38px; padding: 0 12px; border: 1px solid #cbd5e1; border-radius: 8px; font: 500 13px Inter, sans-serif; color: #0f172a; background: #fff; box-sizing: border-box; }
+      .accounts-view .form-group input:focus,
+      .accounts-view .form-group select:focus,
+      .accounts-view .list-filters input:focus,
+      .accounts-view .list-filters select:focus { outline: none; border-color: #2563eb; box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12); }
+      .accounts-view .list-filters { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 16px; }
+      .accounts-view .list-filters input { flex: 1 1 240px; }
+      .accounts-view .button { height: 36px; padding: 0 16px; border-radius: 8px; font: 600 13px Manrope, sans-serif; cursor: pointer; border: 1px solid transparent; }
+      .accounts-view .button-primary { background: #2563eb; color: #ffffff; }
+      .accounts-view .button-primary:hover { background: #1d4ed8; }
+      .accounts-view .button-secondary { background: #f8fafc; color: #334155; border-color: #cbd5e1; }
+      .accounts-view .badge { display: inline-flex; align-items: center; padding: 3px 9px; border-radius: 999px; font: 600 11px/1.2 Inter, sans-serif; background: #f1f5f9; color: #334155; }
+      .accounts-view .badge-activo { background: #dcfce7; color: #15803d; }
+      .accounts-view .badge-inactivo { background: #fee2e2; color: #b91c1c; }
+      .accounts-view .badge-tipo.activo, .accounts-view .badge-tipo.ingreso { background: #dbeafe; color: #1d4ed8; }
+      .accounts-view .badge-tipo.pasivo, .accounts-view .badge-tipo.gasto { background: #fef3c7; color: #b45309; }
+      .accounts-view .badge-tipo.patrimonio { background: #ede9fe; color: #6d28d9; }
+      .accounts-view .text-link { background: transparent; border: none; padding: 4px 8px; border-radius: 6px; font: 600 12px Inter, sans-serif; color: #2563eb; cursor: pointer; }
+      .accounts-view .text-link:hover { background: #eff6ff; }
+      .accounts-view .text-link.danger { color: #dc2626; }
+      .accounts-view .text-link.danger:hover { background: #fef2f2; }
+      .accounts-view .text-link.success { color: #16a34a; }
+      .accounts-view .text-link.success:hover { background: #f0fdf4; }
+    </style>
+
     <section class="accounts-view">
       <div class="panel-heading">
         <h2>— CATÁLOGO CONTABLE</h2>
@@ -164,17 +201,13 @@ function renderAccountList(accounts) {
     const canDelete = integrity.allowed
     const deleteBtn = canDelete
       ? `<button type="button" class="text-link" data-action="delete" data-account-id="${account.id}">Eliminar</button>`
-      : `<button type="button" class="text-link danger" data-action="desactivar" data-account-id="${account.id}">Desactivar</button>`
+      : ''
 
     const editBtn = `<button type="button" class="text-link" data-action="edit" data-account-id="${account.id}">Editar</button>`
 
-    const activateBtn = account.activa === false
+    const toggleActiveBtn = account.activa === false
       ? `<button type="button" class="text-link success" data-action="activar" data-account-id="${account.id}">Activar</button>`
-      : ''
-
-    const desactivateBtn = account.activa === true
-      ? `<button type="button" class="text-link danger" data-action="desactivar" data-account-id="${account.id}">Desactivar</button>`
-      : ''
+      : `<button type="button" class="text-link danger" data-action="desactivar" data-account-id="${account.id}">Desactivar</button>`
 
     html += `
       <div style="border: 1px solid #e0e7ff; border-radius: 8px; padding: 16px; margin: 8px 0; background: #f8fbff; display: grid; grid-template-columns: 1fr auto; gap: 12px; align-items: start">
@@ -196,8 +229,7 @@ function renderAccountList(accounts) {
           </div>
         </div>
         <div style="grid-column: 2 / 3; align-self: center; justify-self: end; white-space: nowrap">
-          ${activateBtn}
-          ${desactivateBtn}
+          ${toggleActiveBtn}
           ${editBtn}
           ${deleteBtn}
         </div>
@@ -213,16 +245,19 @@ export function render() {
   const accounts = loadCollection('accounts').records
   editingId = null
   queueMicrotask(bindViewListeners)
-  return render(accounts)
+  return renderAccountForm({}, accounts)
 }
 
 function refreshView() {
   const currentView = document.querySelector('.accounts-view')
   if (!currentView) return
 
+  const editingAccount = editingId
+    ? loadCollection('accounts').records.find((a) => a.id === editingId) || {}
+    : {}
   const container = document.createElement('div')
-  container.innerHTML = render(loadCollection('accounts').records)
-  currentView.replaceWith(container.firstElementChild)
+  container.innerHTML = renderAccountForm(editingAccount, loadCollection('accounts').records)
+  currentView.replaceWith(container.querySelector('.accounts-view'))
   bindViewListeners()
 }
 
