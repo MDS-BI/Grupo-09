@@ -138,10 +138,37 @@ placeholderView?.addEventListener('click', (event) => {
 
 navItems.forEach((item) => item.addEventListener('click', () => navigate(item.dataset.view)));
 
-document.querySelector('#sidebar-toggle')?.addEventListener('click', (event) => {
-  document.body.classList.toggle('sidebar-collapsed');
+const sidebarToggle = document.querySelector('#sidebar-toggle');
+const narrowQuery = typeof window.matchMedia === 'function' ? window.matchMedia('(max-width: 980px)') : null;
+
+function isNarrowViewport() {
+  if (narrowQuery) return narrowQuery.matches;
+  return window.innerWidth <= 980;
+}
+
+function syncSidebarToggle() {
+  if (!sidebarToggle) return;
   const collapsed = document.body.classList.contains('sidebar-collapsed');
-  event.currentTarget.setAttribute('aria-label', collapsed ? 'Expandir menú' : 'Contraer menú');
+  sidebarToggle.setAttribute('aria-expanded', String(!collapsed));
+  sidebarToggle.setAttribute('aria-label', collapsed ? 'Expandir menú' : 'Contraer menú');
+}
+
+sidebarToggle?.addEventListener('click', (event) => {
+  event.preventDefault();
+  event.stopPropagation();
+  document.body.classList.toggle('sidebar-collapsed');
+  syncSidebarToggle();
+});
+
+let narrowViewport = isNarrowViewport();
+if (narrowViewport) document.body.classList.add('sidebar-collapsed');
+syncSidebarToggle();
+
+window.addEventListener('resize', () => {
+  const nextNarrow = isNarrowViewport();
+  if (nextNarrow && !narrowViewport) document.body.classList.add('sidebar-collapsed');
+  narrowViewport = nextNarrow;
+  syncSidebarToggle();
 });
 
 window.addEventListener('storage', (event) => {
