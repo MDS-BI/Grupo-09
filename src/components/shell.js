@@ -113,10 +113,37 @@ document.querySelectorAll('[data-go]').forEach((button) =>
 document.querySelector('#new-transaction')?.addEventListener('click', () => showToast('Formulario de nueva transacción listo para conectar.'))
 document.querySelector('#placeholder-action')?.addEventListener('click', () => showToast('Esta acción estará disponible al conectar los datos del módulo.'))
 document.querySelector('#export-button')?.addEventListener('click', () => showToast('Preparando exportación del resumen financiero…'))
-document.querySelector('#sidebar-toggle')?.addEventListener('click', () => {
-  document.body.classList.toggle('sidebar-collapsed')
+const sidebarToggle = document.querySelector('#sidebar-toggle')
+const narrowQuery = typeof window.matchMedia === 'function' ? window.matchMedia('(max-width: 980px)') : null
+
+function isNarrowViewport() {
+  if (narrowQuery) return narrowQuery.matches
+  return window.innerWidth <= 980
+}
+
+function syncSidebarToggle() {
+  if (!sidebarToggle) return
   const collapsed = document.body.classList.contains('sidebar-collapsed')
-  document.querySelector('#sidebar-toggle').setAttribute('aria-label', collapsed ? 'Expandir menú' : 'Contraer menú')
+  sidebarToggle.setAttribute('aria-expanded', String(!collapsed))
+  sidebarToggle.setAttribute('aria-label', collapsed ? 'Expandir menú' : 'Contraer menú')
+}
+
+sidebarToggle?.addEventListener('click', event => {
+  event.preventDefault()
+  event.stopPropagation()
+  document.body.classList.toggle('sidebar-collapsed')
+  syncSidebarToggle()
+})
+
+let narrowViewport = isNarrowViewport()
+if (narrowViewport) document.body.classList.add('sidebar-collapsed')
+syncSidebarToggle()
+
+window.addEventListener('resize', () => {
+  const nextNarrow = isNarrowViewport()
+  if (nextNarrow && !narrowViewport) document.body.classList.add('sidebar-collapsed')
+  narrowViewport = nextNarrow
+  syncSidebarToggle()
 })
 document.querySelector('#view-dashboard')?.addEventListener('visible', refreshDashboard)
 
