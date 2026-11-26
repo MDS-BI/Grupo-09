@@ -1,6 +1,6 @@
 import { loadCollection, addRecord } from '../storage.js'
 
-const USER_BASE_KEY = '@erp-user-base'
+export const USER_BASE_KEY = '@erp-user-base'
 const DEPARTMENT_BASE_KEY = '@erp-department-base'
 
 export const USERS = {

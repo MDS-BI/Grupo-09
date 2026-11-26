@@ -1,5 +1,11 @@
-import { addRecord, loadCollection, saveCollection } from '../storage.js'
-import { addUser, addDepartment, loadUsers, loadDepartments } from '../domain/shared.js'
+import { addRecord, loadCollection, saveCollection, updateRecord } from '../storage.js'
+import {
+  USER_BASE_KEY,
+  addUser,
+  addDepartment,
+  loadUsers,
+  loadDepartments,
+} from '../domain/shared.js'
 
 const COMPANY_COLLECTION = 'company'
 const BRANCH_COLLECTION = 'branches'
@@ -22,6 +28,30 @@ export const INITIAL_BRANCH = {
   direccion: 'Caracas, Venezuela',
   activa: true,
 }
+
+export const INITIAL_USERS = [
+  {
+    id: 'user-1',
+    name: 'Camila Méndez',
+    role: 'admin',
+    jobTitle: 'Jefe / Gerente de Finanzas',
+    createdAt: new Date().toISOString(),
+  },
+  {
+    id: 'user-2',
+    name: 'Contador',
+    role: 'contador',
+    jobTitle: 'Contador',
+    createdAt: new Date().toISOString(),
+  },
+  {
+    id: 'user-3',
+    name: 'Empleado',
+    role: 'user',
+    jobTitle: 'Empleado',
+    createdAt: new Date().toISOString(),
+  },
+]
 
 export const INITIAL_COST_CENTERS = [
   { id: 'dept-1', nombre: 'Ventas', codigo: 'VEN', acepta_movimientos: true, es_efectivo: false, creado_por: 'user-1' },
@@ -151,6 +181,7 @@ export function seedBaseAccounts() {
 
 export function ensureSeedData() {
   return {
+    users: seedUsers(),
     company: seedCompany(),
     branch: seedBranch(),
     costCenters: seedCostCenters(),
@@ -159,12 +190,24 @@ export function ensureSeedData() {
 }
 
 export function seedUsers() {
-  SEED.users = [
-    { id: 'user-1', name: 'Administrador', role: 'admin', createdAt: new Date().toISOString() },
-    { id: 'user-2', name: 'Contador', role: 'user', createdAt: new Date().toISOString() },
-  ]
-  loadUsers()
-  SEED.users.forEach((user) => addUser(user))
+  const existing = loadUsers()
+  SEED.users = INITIAL_USERS
+
+  INITIAL_USERS.forEach((user) => {
+    const current = existing.find((item) => item.id === user.id)
+    if (!current) {
+      addUser(user)
+      return
+    }
+
+    const changes = Object.fromEntries(
+      Object.entries(user).filter(([key, value]) => current[key] !== value && key !== 'createdAt'),
+    )
+    if (Object.keys(changes).length > 0) {
+      updateRecord(USER_BASE_KEY, current._id, changes)
+    }
+  })
+
   return SEED.users
 }
 

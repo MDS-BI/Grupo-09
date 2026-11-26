@@ -1,6 +1,6 @@
 import { loadCollection, saveCollection } from '../storage.js';
 import { ENTRY_STATE } from '../domain/entry.js';
-import { loadUsers } from '../domain/shared.js';
+import { canManageEntries, getCurrentUser } from '../services/auth-service.js';
 import { approveEntry as advanceEntry } from '../services/entry-service.js';
 import { canApprove, isValidTransition } from '../services/approval-service.js';
 import { reverseEntry } from '../services/reverse-service.js';
@@ -130,7 +130,7 @@ export function render() {
             </thead>
             <tbody id="entries-body">
               ${entries
-                .map((entry) => renderEntryRow(entry, entries, accounts, departments, user))
+                .map((entry) => renderEntryRow(entry, entries, accounts, departments, user || {}))
                 .join('')}
             </tbody>
           </table>
@@ -241,7 +241,7 @@ function transitionEntry(entry, action) {
     return;
   }
 
-  const user = getCurrentUser();
+  const user = getCurrentUser() || {};
   if (action !== 'submit' && !canApprove(user.role, entry.estado)) {
     notify('El usuario activo no tiene permiso para aprobar o contabilizar asientos.', true);
     return;
@@ -259,6 +259,10 @@ function transitionEntry(entry, action) {
 }
 
 function reversePostedEntry(entry, entries) {
+  if (!canManageEntries(getCurrentUser())) {
+    notify('El usuario activo no tiene permiso para revertir asientos.', true);
+    return;
+  }
   if (entry.estado !== ENTRY_STATE.CONTABILIZADA) {
     notify('Solo se pueden revertir asientos en estado Contabilizada.', true);
     return;
@@ -419,7 +423,7 @@ function renderEntryRow(entry, entries, accounts, departments, user) {
           ${renderStepButtons(entry, user.role)}
           <button class="button button-secondary button-compact" type="button" data-action="edit" data-entry-id="${id}"${editDisabled}>Editar</button>
           <button class="button button-secondary button-compact" type="button" data-action="delete" data-entry-id="${id}"${deleteDisabled}>Eliminar</button>
-          <button class="button ${entry.estado === ENTRY_STATE.CONTABILIZADA && !hasReverse ? 'button-primary' : 'button-secondary'} button-compact" type="button" data-action="reverse" data-entry-id="${id}"${entry.estado === ENTRY_STATE.CONTABILIZADA && !hasReverse ? '' : ` disabled title="${hasReverse ? 'Ya existe una reversa para este asiento' : 'Solo se pueden revertir asientos contabilizados'}"`}>Revertir</button>
+          ${renderReverseButton(entry, user, hasReverse)}
         </div>
       </td>
     </tr>
@@ -429,6 +433,16 @@ function renderEntryRow(entry, entries, accounts, departments, user) {
       </td>
     </tr>
   `;
+}
+
+function renderReverseButton(entry, user, hasReverse) {
+  const allowed = entry.estado === ENTRY_STATE.CONTABILIZADA && !hasReverse && canManageEntries(user);
+  const reason = !canManageEntries(user)
+    ? 'Sin permiso de reversa'
+    : hasReverse
+      ? 'Ya existe una reversa para este asiento'
+      : 'Solo se pueden revertir asientos contabilizados';
+  return `<button class="button ${allowed ? 'button-primary' : 'button-secondary'} button-compact" type="button" data-action="reverse" data-entry-id="${escapeHtml(entry.id || '')}"${allowed ? '' : ` disabled title="${escapeHtml(reason)}"`}>Revertir</button>`;
 }
 
 function renderStepButtons(entry, role) {
@@ -554,15 +568,6 @@ function matchesFilters(entry, currentFilters) {
     .join(' ')
     .toLocaleLowerCase('es');
   return searchText.includes(currentFilters.busqueda);
-}
-
-function getCurrentUser() {
-  const users = loadUsers().filter(Boolean);
-  return (
-    users.find((user) => user.role === 'admin') ||
-    users[0] ||
-    { id: 'user-1', role: 'admin', name: 'Camila Méndez' }
-  );
 }
 
 function accountName(accounts, accountId) {

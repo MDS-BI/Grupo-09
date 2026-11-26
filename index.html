@@ -9,13 +9,15 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap"
+      href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap"
       rel="stylesheet"
     />
     <link rel="stylesheet" href="/src/styles.css" />
     <script type="module" src="/src/main.js"></script>
   </head>
   <body>
+    <div class="login-root" id="login-root" hidden></div>
+
     <div class="app-shell">
       <aside class="sidebar" id="sidebar" aria-label="Navegación principal">
         <a class="brand" href="#dashboard" aria-label="Atlas ERP, ir al panel">
@@ -111,9 +113,9 @@
             <svg viewBox="0 0 24 24"><path d="m9 18 6-6-6-6" /></svg>
           </button>
         </div>
-        <button class="profile-button">
-          <span class="profile-avatar">CM</span
-          ><span class="profile-copy"><strong>Camila Méndez</strong><small>Gerente de Finanzas</small></span
+        <button class="profile-button" id="profile-button" type="button" title="Cerrar sesión / Cambiar usuario">
+          <span class="profile-avatar" id="profile-avatar">CM</span
+          ><span class="profile-copy"><strong id="profile-name">Camila Méndez</strong><small id="profile-role">Jefe / Gerente de Finanzas</small><small class="profile-action" id="profile-action">Cerrar sesión / Cambiar usuario</small></span
           ><svg class="chevron" viewBox="0 0 24 24"><path d="m7 10 5 5 5-5" /></svg>
         </button>
       </aside>
@@ -130,8 +132,8 @@
               <svg viewBox="0 0 24 24"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4" /></svg
               ><i></i></button
             ><span class="topbar-divider"></span
-            ><button class="topbar-profile">
-              <span class="profile-avatar small">CM</span
+            ><button class="topbar-profile" id="topbar-profile" type="button" title="Cerrar sesión / Cambiar usuario">
+              <span class="profile-avatar small" id="topbar-avatar">CM</span
               ><svg class="chevron" viewBox="0 0 24 24"><path d="m7 10 5 5 5-5" /></svg>
             </button>
           </div>

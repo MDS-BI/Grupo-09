@@ -1,7 +1,8 @@
 import { loadCollection } from '../storage.js';
-import { loadDepartments, loadUsers } from '../domain/shared.js';
+import { loadDepartments } from '../domain/shared.js';
 import { ENTRY_STATE } from '../domain/entry.js';
-import { saveEntry } from '../services/entry-service.js';
+import { getCurrentUser } from '../services/auth-service.js';
+import { approveEntry as advanceEntry, saveEntry } from '../services/entry-service.js';
 import { logEvent } from '../services/audit-service.js';
 import { PRECISION } from '../utils/money.js';
 
@@ -125,9 +126,10 @@ export function render() {
 
           <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-top: 16px">
             <p id="balance-status" role="status" aria-live="polite" style="margin: 0; font-size: 10px; color: ${initialBalanced ? '#21875f' : '#b67a2d'}">
-              ${initialBalanced ? 'Asiento cuadrado: Debe y Haber coinciden. Listo para guardar como Borrador.' : 'Ingrese importes positivos de hasta 4 decimales para cuadrar el asiento.'}
+              ${initialBalanced ? 'Asiento cuadrado: Debe y Haber coinciden. Puede guardar como Borrador o enviarlo a revisión.' : 'Ingrese importes positivos de hasta 4 decimales para cuadrar el asiento.'}
             </p>
-            <button class="button button-primary" id="save-entry" type="submit"${initialValid ? '' : ' disabled'} title="${initialValid ? (isEditing ? 'Guardar cambios del asiento' : 'Guardar asiento en estado Borrador') : 'El Debe y el Haber deben ser iguales'}">${escapeHtml(submitLabel)}</button>
+            <button class="button button-secondary" id="save-entry" name="intent" value="draft" type="submit"${initialValid ? '' : ' disabled'} title="${initialValid ? (isEditing ? 'Guardar cambios del asiento' : 'Guardar asiento en estado Borrador') : 'El Debe y el Haber deben ser iguales'}">${escapeHtml(submitLabel)}</button>
+            <button class="button button-primary" id="submit-entry" name="intent" value="submit" type="submit"${initialValid ? '' : ' disabled'} title="${initialValid ? 'Guardar y enviar el asiento a revisión' : 'El Debe y el Haber deben ser iguales'}">Guardar y enviar a revisión</button>
           </div>
         </section>
       </form>
@@ -456,6 +458,7 @@ function handleSubmit(event) {
   const root = getViewRoot(form);
   if (!form || !root) return;
 
+  const sendToReview = event.submitter?.value === 'submit';
   event.preventDefault();
   submitAttempted = true;
   const result = evaluate(root);
@@ -511,6 +514,19 @@ function handleSubmit(event) {
     });
 
     const editedId = saved.entry.id;
+    if (sendToReview) {
+      const submitted = advanceEntry(saved.entry, getCurrentUser()?.id || null);
+      if (!submitted.success) {
+        notify(submitted.error || 'No se pudo enviar el asiento a revisión.', true);
+        return;
+      }
+      resetForm(root);
+      notify(`Asiento ${submitted.entry.id} enviado a revisión (Pendiente).`, false);
+      dispatchDataChanged();
+      navigateToView('transacciones');
+      return;
+    }
+
     resetForm(root);
     notify(`Asiento ${editedId} actualizado en estado Borrador.`, false);
     dispatchDataChanged();
@@ -527,6 +543,19 @@ function handleSubmit(event) {
 
   if (!saved.success) {
     notify(saved.error || saved.errors?.join('; ') || 'No se pudo guardar el asiento.', true);
+    return;
+  }
+
+  if (sendToReview) {
+    const submitted = advanceEntry(saved.entry, getCurrentUser()?.id || null);
+    if (!submitted.success) {
+      notify(submitted.error || 'No se pudo enviar el asiento a revisión.', true);
+      return;
+    }
+    resetForm(root);
+    navigateToView('transacciones');
+    notify(`Asiento ${submitted.entry.id} enviado a revisión (Pendiente).`, false);
+    dispatchDataChanged();
     return;
   }
 
@@ -621,17 +650,20 @@ function updateView(root, result) {
   const status = root.querySelector('#balance-status');
   if (status) {
     status.textContent = result.valid
-      ? 'Asiento cuadrado: Debe y Haber coinciden. Listo para guardar como Borrador.'
+      ? 'Asiento cuadrado: Debe y Haber coinciden. Puede guardar como Borrador o enviarlo a revisión.'
       : result.firstError;
     status.style.color = result.valid ? '#21875f' : '#b67a2d';
   }
 
-  const saveButton = root.querySelector('#save-entry');
-  if (saveButton) {
-    saveButton.disabled = !result.valid;
-    saveButton.setAttribute('aria-disabled', String(!result.valid));
-    saveButton.title = result.valid ? 'Guardar asiento en estado Borrador' : result.firstError;
-  }
+  root.querySelectorAll('#save-entry, #submit-entry').forEach((button) => {
+    button.disabled = !result.valid;
+    button.setAttribute('aria-disabled', String(!result.valid));
+    button.title = result.valid
+      ? button.id === 'submit-entry'
+        ? 'Guardar y enviar el asiento a revisión'
+        : 'Guardar asiento en estado Borrador'
+      : result.firstError;
+  });
 }
 
 function syncLinesFromDom(root) {
@@ -726,8 +758,7 @@ function defaultCurrency() {
 }
 
 function currentUserId() {
-  const users = loadUsers().filter(Boolean);
-  return (users.find((user) => user.role === 'admin') || users[0])?.id || 'user-1';
+  return getCurrentUser()?.id || null;
 }
 
 function findLine(id) {
