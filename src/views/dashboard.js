@@ -1,3 +1,4 @@
+import { getCurrentUser } from '../services/auth-service.js';
 import { loadActivePeriod, loadConfiguredPeriod, saveActivePeriod } from '../services/settings-service.js';
 import { filterEntries } from '../services/query-service.js';
 import { loadCollection } from '../storage.js';
@@ -16,6 +17,7 @@ export function renderDashboard() {
   bindDashboardInteractions();
 
   const greetingText = greeting();
+  const firstName = String(getCurrentUser()?.name || 'Camila').trim().split(/\s+/)[0];
   const todayLabel = formatLongDate(new Date());
   const periodLabel = `${formatDate(period.from)} — ${formatDate(period.to)}`;
   const postedCount = data.entries.length;
@@ -27,7 +29,7 @@ export function renderDashboard() {
             <div class="page-heading">
               <div>
                 <div class="eyebrow"><span class="eyebrow-line"></span> ${escapeHtml(todayLabel)}</div>
-                <h1>${escapeHtml(greetingText)}, Camila <span class="wave">✳</span></h1>
+                <h1>${escapeHtml(greetingText)}, ${escapeHtml(firstName)} <span class="wave">✳</span></h1>
                 <p class="subtitle">Resumen financiero del período contable activo.</p>
               </div>
               <div class="heading-actions">

@@ -1,5 +1,6 @@
 import { loadUsers } from '../domain/shared.js';
 import { getEvents } from '../services/audit-service.js';
+import { getCurrentUser } from '../services/auth-service.js';
 
 export const viewInfo = {
   title: 'Registro de auditoría',
@@ -45,7 +46,7 @@ const ENTITY_LABELS = {
 export function render(events) {
   const records = Array.isArray(events) ? sortEvents(events) : loadEvents();
   const users = loadUsers().filter(Boolean);
-  const activeUser = getCurrentUser(users);
+  const activeUser = getCurrentUser();
 
   return `
     <section class="audit-view" id="audit-view" aria-label="Bitácora de auditoría">
@@ -194,31 +195,6 @@ function resolveUser(event, users, activeUser) {
     return users.find((user) => user.id === id || user._id === id) || { id, name: id };
   }
   return activeUser;
-}
-
-function getCurrentUser(users) {
-  const sessionKeys = [
-    '@erp-active-user',
-    '@erp-current-user',
-    '@erp-session',
-    'activeUser',
-    'usuarioActivo',
-  ];
-  for (const key of sessionKeys) {
-    const raw = localStorage.getItem(key);
-    if (!raw) continue;
-    let value = raw;
-    try {
-      value = JSON.parse(raw);
-    } catch {
-      value = raw;
-    }
-    const id = typeof value === 'string' ? value : value?.id || value?.userId || value?.user?.id;
-    const match = users.find((user) => user.id === id || user._id === id);
-    if (match) return match;
-    if (id) return { id, name: id };
-  }
-  return users.find((user) => user.role === 'admin') || users[0] || { id: 'user-1', name: 'Administrador' };
 }
 
 function userLabel(user) {

@@ -143,7 +143,12 @@ export function approveEntry(entry, approverId) {
   if (!result.success) return result
 
   logEvent({
-    type: 'approve',
+    type:
+      nextState === ENTRY_STATE.PENDIENTE
+        ? 'submit'
+        : nextState === ENTRY_STATE.CONTABILIZADA
+          ? 'post'
+          : 'approve',
     entityType: 'entry',
     entityId: result.entry.id,
     previousState: entry.estado,
