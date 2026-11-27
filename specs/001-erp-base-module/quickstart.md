@@ -20,7 +20,8 @@ npm run build           # build de producción
 
 ## Flujo principal
 
-1. Aterrice en el Panel General y revise las métricas de ingresos, gastos, resultado neto y flujo de caja.
+0. Inicie sesión seleccionando su perfil en la pantalla de inicio (contraseña de demostración opcional y visible en pantalla: `atlas123`). Este inicio de sesión es una implementación propia del módulo, no una integración real con el ERP anfitrión — ver "Limitaciones Conocidas" en `spec.md`.
+1. Aterrice en el Panel General y revise las métricas de ingresos, gastos, resultado neto y flujo de caja. El panel también ofrece exportar los datos mostrados a CSV.
 2. Cree o revise el plan de cuentas; marque al menos una cuenta como efectivo/banco (`es_efectivo`), otra como Ingreso y otra como Egreso.
 3. Registre un asiento balanceado con al menos dos líneas, asignando centro de costo cuando corresponda.
 4. Envíe el asiento a revisión, apruébelo y contabilícelo.
@@ -75,6 +76,8 @@ npm run build           # build de producción
 4. Simule una versión de esquema incompatible en una copia de respaldo y vuelva a cargar.
 
 **Esperado**: el período persiste y el Panel General y Reportes lo usan por defecto; cuentas, asientos y eventos se restauran sin pérdida, duplicación ni degradación de precisión; una versión incompatible conserva los datos y muestra una explicación, sin descartarlos silenciosamente; las configuraciones inválidas o invertidas se rechazan conservando la anterior.
+
+**Nota de estado actual**: Configuración solo ofrece los presets mes/trimestre/rango personalizado. Reportes y Centros de Costo exponen además año y año anterior directamente en su propio selector de período, independientemente de lo guardado en Configuración.
 
 ## Validación de las historias base (US1–US6)
 

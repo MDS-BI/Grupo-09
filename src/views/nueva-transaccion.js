@@ -239,23 +239,20 @@ function isInitialEntryValid() {
   };
   const headerOk = Boolean(
     header.fecha_contable &&
-      header.tipo_documento &&
-      header.numero_documento &&
-      header.descripcion &&
-      /^[A-Z]{3}$/.test(header.moneda),
+    header.tipo_documento &&
+    header.numero_documento &&
+    header.descripcion &&
+    /^[A-Z]{3}$/.test(header.moneda),
   );
   const accounts = selectableAccounts();
   const linesOk =
     lines.length >= MIN_LINES &&
     lines.every((line) => {
-      const cuentaOk = accounts.some(
-        (account) => String(account.id ?? account._id ?? '') === line.cuenta,
-      );
+      const cuentaOk = accounts.some((account) => String(account.id ?? account._id ?? '') === line.cuenta);
       const debeRaw = String(line.debe ?? '').trim();
       const haberRaw = String(line.haber ?? '').trim();
       const amountOk =
-        (debeRaw && !haberRaw && checkAmount(debeRaw).valid) ||
-        (haberRaw && !debeRaw && checkAmount(haberRaw).valid);
+        (debeRaw && !haberRaw && checkAmount(debeRaw).valid) || (haberRaw && !debeRaw && checkAmount(haberRaw).valid);
       return Boolean(line.cuenta && cuentaOk && amountOk);
     });
   return headerOk && linesOk;
@@ -301,9 +298,7 @@ function dispatchDataChanged() {
 
 function navigateToView(view) {
   if (typeof document === 'undefined') return;
-  const nav = [...document.querySelectorAll('.nav-item')].find(
-    (item) => item.dataset.view === view,
-  );
+  const nav = [...document.querySelectorAll('.nav-item')].find((item) => item.dataset.view === view);
   nav?.click();
 }
 
@@ -349,7 +344,9 @@ function renderAccountOptions(selected) {
   for (const account of selectableAccounts()) {
     const id = String(account.id ?? account._id ?? '');
     const label = [account.codigo, account.nombre].filter(Boolean).join(' — ') || id;
-    options.push(`<option value="${escapeHtml(id)}"${id === selected ? ' selected' : ''}>${escapeHtml(label)}</option>`);
+    options.push(
+      `<option value="${escapeHtml(id)}"${id === selected ? ' selected' : ''}>${escapeHtml(label)}</option>`,
+    );
   }
   return options.join('');
 }
@@ -359,13 +356,17 @@ function renderCostCenterOptions(selected) {
   for (const department of costCenters()) {
     const id = String(department.id ?? department._id ?? '');
     const label = department.nombre || department.codigo || id;
-    options.push(`<option value="${escapeHtml(id)}"${id === selected ? ' selected' : ''}>${escapeHtml(label)}</option>`);
+    options.push(
+      `<option value="${escapeHtml(id)}"${id === selected ? ' selected' : ''}>${escapeHtml(label)}</option>`,
+    );
   }
   return options.join('');
 }
 
 function selectableAccounts() {
-  return loadCollection('accounts').records.filter(Boolean).filter((account) => isSelectableAccount(account));
+  return loadCollection('accounts')
+    .records.filter(Boolean)
+    .filter((account) => isSelectableAccount(account));
 }
 
 function isSelectableAccount(account) {
@@ -374,14 +375,12 @@ function isSelectableAccount(account) {
 
 function costCenters() {
   const seen = new Set();
-  return [...loadDepartments(), ...loadCollection('centros-costo').records]
-    .filter(Boolean)
-    .filter((department) => {
-      const id = String(department.id ?? department._id ?? '');
-      if (!id || seen.has(id) || department.activa === false) return false;
-      seen.add(id);
-      return true;
-    });
+  return [...loadDepartments(), ...loadCollection('centros-costo').records].filter(Boolean).filter((department) => {
+    const id = String(department.id ?? department._id ?? '');
+    if (!id || seen.has(id) || department.activa === false) return false;
+    seen.add(id);
+    return true;
+  });
 }
 
 function handleFieldChange(event) {
@@ -404,8 +403,7 @@ function handleClick(event) {
   const navigation = event.target?.closest?.('.nav-item[data-view], [data-go]');
   if (navigation && editingEntryId) {
     const targetView = navigation.dataset.view || navigation.dataset.go;
-    const normalizedView =
-      targetView === 'entries' || targetView === 'transactions' ? 'transacciones' : targetView;
+    const normalizedView = targetView === 'entries' || targetView === 'transactions' ? 'transacciones' : targetView;
     if (normalizedView !== 'nueva-transaccion') resetEditingContext();
   }
 
@@ -446,9 +444,7 @@ function handleClick(event) {
 
   const goButton = event.target.closest('[data-go]');
   if (goButton) {
-    const nav = [...document.querySelectorAll('.nav-item')].find(
-      (item) => item.dataset.view === goButton.dataset.go,
-    );
+    const nav = [...document.querySelectorAll('.nav-item')].find((item) => item.dataset.view === goButton.dataset.go);
     nav?.click();
   }
 }
@@ -480,9 +476,7 @@ function handleSubmit(event) {
   }));
 
   if (editingEntryId) {
-    const existing = loadCollection('entries').records.find(
-      (item) => item.id === editingEntryId,
-    );
+    const existing = loadCollection('entries').records.find((item) => item.id === editingEntryId);
     if (!existing || existing.estado !== ENTRY_STATE.BORRADOR) {
       resetEditingContext();
       notify('El asiento ya no está disponible para edición.', true);
@@ -614,7 +608,9 @@ function evaluate(root) {
     (lineCountOk ? '' : `Se requieren al menos ${MIN_LINES} líneas`) ||
     firstLineError ||
     (bothSides ? '' : 'Se requiere al menos una línea de cargo (Debe) y una de abono (Haber)') ||
-    (balanced ? '' : `El total de Debe debe ser exactamente igual al total de Haber (diferencia ${formatScaled(debeScaled - haberScaled)})`);
+    (balanced
+      ? ''
+      : `El total de Debe debe ser exactamente igual al total de Haber (diferencia ${formatScaled(debeScaled - haberScaled)})`);
 
   return {
     errorsByLine,

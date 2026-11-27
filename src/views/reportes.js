@@ -433,7 +433,7 @@ function entryDate(entry) {
   return '';
 }
 
-function buildReportData(from, to) {
+export function buildReportData(from, to) {
   const posted = loadPostedEntries(from, to);
   const accountsById = new Map(
     loadCollection('accounts')

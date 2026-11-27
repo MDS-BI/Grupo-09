@@ -494,3 +494,37 @@ Task: "Create integration tests in tests/integration/reports.test.js"
 - `contracts/entity-storage.md` documents the legacy base Entity/Document contract and does not apply to the accounting module; no contract tests are generated from it
 - Commit after each task or logical group
 - Stop at any checkpoint to validate the story independently
+
+---
+
+## Reality Note (synchronized 2026-11-26)
+
+The "Module Source Structure (target)" block above, and every `src/components/*` file path referenced in Phases 1–15 below, describe the **original plan**, not what was actually built. The real, running application differs as follows:
+
+- Routing and view mounting happen entirely inline in `src/main.js` (hash-based route table), not in `src/components/shell.js`.
+- The real view files live in `src/views/*.js` with Spanish names: `dashboard.js`, `plan-cuentas.js`, `nueva-transaccion.js`, `transacciones.js`, `consulta.js`, `centros-costo.js`, `reportes.js`, `auditoria.js`, `configuracion.js`, `login.js` (plus an unused `placeholder.js`).
+- `src/components/*` (11 files: `shell.js`, `dashboard.js`, `account-form.js`, `account-list.js`, `entry-form.js`, `entry-list.js`, `entry-actions.js`, `cost-centers-view.js`, `reports-view.js`, `audit-view.js`, `settings-view.js`) and `src/module-config.js` are confirmed dead code — not imported anywhere outside themselves.
+- `src/services/metrics-service.js`, `cost-center-service.js` and `report-service.js` are implemented and tested but not consumed by any real view; `dashboard.js`, `centros-costo.js` and `reportes.js` each reimplement their own aggregation.
+- `src/services/auth-service.js` and `src/views/login.js` (a real login/session system, not in the original plan) exist and gate the app.
+
+Historical tasks below are left as originally written (append-only record of what was planned); do not use their `src/components/*` paths as a guide to the current codebase. See `plan.md`'s "Desviaciones conocidas respecto al diseño original" and `data-model.md` for full detail. Phase 16 below tracks the real, confirmed gaps as of this sync.
+
+---
+
+## Phase 16: Known Implementation Gaps (confirmed 2026-11-26)
+
+These are verified defects/architecture gaps in the current codebase, independent of the documentation-sync direction — i.e. they remain true whether spec.md is read as intent or as description of reality.
+
+- [ ] T077 Replace vacuous/no-op test assertions with concrete expected-value assertions in `tests/unit/account-integrity.test.js` (lines 11-39, 46-56), `tests/integration/account-integrity.test.js` (11-39, 52-62), `tests/unit/reports.test.js` (57-59, 61-79, 88-106), `tests/integration/approval-flow.test.js` (38-61), `tests/integration/audit-log.test.js` (12-33, 63-66), and `tests/integration/entry-line-validation.test.js` (49-85) per Constitution II (test-first)
+- [ ] T078 Fix `account-service.checkAccountIntegrity` in `src/services/account-service.js` so it also blocks deletion of accounts referenced by `Contabilizada`/`Revertida` entries (currently only blocks for Borrador/Pendiente/Aprobada, the opposite of the intended protection) per FR-034 (bug)
+- [ ] T079 Make `isCashInflowAccount()` in `src/views/dashboard.js` use only `Cuenta_Contable.es_efectivo` (remove the `tipo`/`codigo` fallback) so it matches `src/views/reportes.js` and eliminates dashboard/report cash-flow discrepancies per FR-033 (bug)
+- [ ] T080 Add account lifecycle events (create/edit/deactivate/reactivate) to the real global audit log (`src/services/audit-service.js::logEvent`) from `src/domain/account.js`/`src/services/account-service.js`, and remove the dead-end parallel `accountAuditLogs` localStorage writer in `src/views/plan-cuentas.js` per FR-037 (bug)
+- [ ] T081 Add indirect hierarchy-cycle and inactive-parent validation to `src/domain/account.js`'s `accountValidator` (or `src/services/account-service.js`, actually wired into `addAccount`/`updateAccount` as called by `src/views/plan-cuentas.js`) so cycle protection isn't solely a UI-layer concern in `creaCicloJerarquico()` per FR-035 (gap)
+- [ ] T082 Add entry-reference checks to `src/domain/shared.js`'s `canDeleteUser`/`canDeleteDepartment` before allowing deletion of a referenced user or department per FR-021, FR-023 (bug)
+- [ ] T083 Add shape/type validation for individual stored records per collection when loading in `src/storage.js`, preserving existing data and informing the user on malformed records instead of trusting `schemaVersion` presence/equality alone per FR-039 (gap)
+- [ ] T084 Scope `addEntry()` in `src/services/entry-service.js` as a test-only seeding helper (move to `tests/setup` or `src/utils/seed.js`) or add the same balance/line validation guard as `saveEntry` so the service's public surface cannot bypass validation per FR-012, FR-036 (bug)
+- [ ] T085 Consolidate the duplicate approval implementations (`src/services/entry-service.js::approveEntry` vs `src/services/approval-service.js::approveEntry`) and the duplicate reverse implementations (`src/services/entry-service.js::reverseEntry` vs `src/services/reverse-service.js::reverseEntry`, which also disagree on `>= 0` vs `> 0` when swapping sides) into one canonical implementation each — matching whichever one `src/views/transacciones.js` actually calls — and delete the other per Constitution I (maintainability)
+- [ ] T086 Wire `src/views/dashboard.js`, `src/views/centros-costo.js` and `src/views/reportes.js` to the shared `src/services/metrics-service.js`, `cost-center-service.js` and `report-service.js` aggregation instead of each view re-implementing its own, or retire the unused services if the per-view approach is kept intentionally (plan: single aggregation source)
+- [ ] T087 Delete the unwired `src/components/*` tree (11 files) and `src/module-config.js`, superseded by `src/views/*` and `src/main.js` (dead code cleanup)
+- [ ] T088 Decide and document whether `src/services/auth-service.js`'s demo-password login is a permanent placeholder or should be replaced by real host-ERP SSO integration before this module leaves demo status per spec: Assumptions / FR-021
+- [ ] T089 Once T086 wires views to the shared services, extend `tests/unit/cost-center.test.js` and `tests/unit/reports.test.js` to cover the production aggregation path exercised by `src/views/centros-costo.js` and `src/views/reportes.js` (test-coverage gap)

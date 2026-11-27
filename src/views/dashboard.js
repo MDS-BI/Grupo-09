@@ -17,7 +17,9 @@ export function renderDashboard() {
   bindDashboardInteractions();
 
   const greetingText = greeting();
-  const firstName = String(getCurrentUser()?.name || 'Camila').trim().split(/\s+/)[0];
+  const firstName = String(getCurrentUser()?.name || 'Camila')
+    .trim()
+    .split(/\s+/)[0];
   const todayLabel = formatLongDate(new Date());
   const periodLabel = `${formatDate(period.from)} — ${formatDate(period.to)}`;
   const postedCount = data.entries.length;
@@ -223,12 +225,16 @@ function cleanupDashboardListeners() {
 
 function handleDashboardInput(event) {
   if (!event.target.closest?.('#transaction-search')) return;
-  const query = String(event.target.value || '').trim().toLocaleLowerCase('es');
+  const query = String(event.target.value || '')
+    .trim()
+    .toLocaleLowerCase('es');
   const rows = document.querySelectorAll('#transactions-body tr[data-search]');
   let visibleCount = 0;
 
   rows.forEach((row) => {
-    const matches = String(row.dataset.search || '').toLocaleLowerCase('es').includes(query);
+    const matches = String(row.dataset.search || '')
+      .toLocaleLowerCase('es')
+      .includes(query);
     row.hidden = !matches;
     if (matches) visibleCount += 1;
   });
@@ -501,7 +507,7 @@ export function refreshDashboardMetrics() {
   if (fallbackHost) fallbackHost.innerHTML = renderDashboard();
 }
 
-function buildDashboardData(period) {
+export function buildDashboardData(period) {
   const accounts = loadCollection('accounts').records;
   const entries = filterEntries({
     fecha_desde: period.from,
@@ -559,8 +565,7 @@ function summarizeEntries(entries, accounts) {
 }
 
 function isCashInflowAccount(account) {
-  if (account.es_efectivo === true) return true;
-  return account.tipo === 'Activo' && String(account.codigo || '').startsWith('1');
+  return account.es_efectivo === true;
 }
 
 function isCashOutflowAccount(account) {
@@ -621,7 +626,12 @@ function lastDayOfMonth(key) {
 }
 
 function resolveActivePeriod(storedPeriod) {
-  if (storedPeriod && isValidDate(storedPeriod.desde) && isValidDate(storedPeriod.hasta) && storedPeriod.desde <= storedPeriod.hasta) {
+  if (
+    storedPeriod &&
+    isValidDate(storedPeriod.desde) &&
+    isValidDate(storedPeriod.hasta) &&
+    storedPeriod.desde <= storedPeriod.hasta
+  ) {
     return { from: storedPeriod.desde, to: storedPeriod.hasta, modo: storedPeriod.modo };
   }
   return currentMonthPeriod();
@@ -652,9 +662,10 @@ function quarterPeriod(year, monthIndex) {
   const endMonth = firstMonth + 2;
   return {
     from: `${year}-${String(firstMonth + 1).padStart(2, '0')}-01`,
-    to: `${year}-${String(endMonth + 1).padStart(2, '0')}-${String(
-      new Date(year, endMonth + 1, 0).getDate(),
-    ).padStart(2, '0')}`,
+    to: `${year}-${String(endMonth + 1).padStart(2, '0')}-${String(new Date(year, endMonth + 1, 0).getDate()).padStart(
+      2,
+      '0',
+    )}`,
     modo: 'quarter',
   };
 }

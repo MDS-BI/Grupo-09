@@ -223,7 +223,7 @@ Como Gerente de Finanzas, quiero configurar el período contable activo por defe
 - **FR-002**: El sistema MUST mostrar todas las métricas en cero y un estado vacío comprensible cuando no existan asientos registrados.
 - **FR-003**: El sistema MUST actualizar las métricas del panel cuando se registren, aprueben, contabilicen o reviertan asientos.
 - **FR-004**: Los usuarios MUST poder crear, editar, desactivar y reactivar cuentas contables con código, nombre, tipo, naturaleza, cuenta padre y estado.
-- **FR-005**: El sistema MUST garantizar que el código de cuenta sea único y obligatorio, conservándolo como texto para admitir códigos jerárquicos como "1.1.1".
+- **FR-005**: El sistema MUST garantizar que el código de cuenta sea único y obligatorio, conservándolo como texto. **Estado actual de la implementación**: el formato aceptado admite un único segmento decimal (por ejemplo "1.1"), no códigos jerárquicos de varios niveles como "1.1.1"; ampliar el formato a jerarquías multinivel queda pendiente.
 - **FR-006**: El sistema MUST permitir jerarquías de cuentas y MUST impedir ciclos, autorreferencias y la asignación de cuentas inactivas como padre.
 - **FR-007**: El sistema MUST permitir imputar movimientos únicamente a cuentas activas que acepten movimientos.
 - **FR-008**: El sistema MUST impedir la eliminación de cuentas con movimientos asociados y MUST ofrecer su desactivación como alternativa.
@@ -298,7 +298,7 @@ Como Gerente de Finanzas, quiero configurar el período contable activo por defe
 - La interfaz se presenta en español y reutiliza la barra superior, la navegación lateral y los estilos del espacio de trabajo ERP existente.
 - El módulo opera sobre una sola empresa o instancia contable y una sola moneda por asiento; la conversión multimoneda queda fuera de esta versión.
 - Los usuarios y departamentos ya existen en el ERP anfitrión y el módulo solo los referencia; no se duplican sus catálogos ni se gestionan credenciales.
-- La autenticación y los permisos por rol son provistos por el ERP anfitrión; el módulo consume esa identidad para la auditoría y el control de acceso.
+- La intención de diseño es que la autenticación y los permisos por rol sean provistos por el ERP anfitrión. **Estado actual de la implementación**: el módulo incluye su propia pantalla de inicio de sesión sobre el catálogo compartido de usuarios, con una contraseña de demostración única y visible en pantalla (no credenciales individuales reales), pensada como sustituto temporal mientras no se integre el inicio de sesión del ERP anfitrión. El control de acceso por rol (Administrador, Contador, Empleado) sí se aplica en código de la aplicación antes de ejecutar acciones sensibles, no solo ocultando botones.
 - El estándar contable aplicable es el de partida doble general; no se implementan reglas fiscales específicas de un país en esta versión.
 - Los importes se registran con precisión decimal exacta de hasta cuatro decimales y no se usa aritmética de punto flotante para cálculos monetarios.
 - El flujo de aprobación requiere que un asiento pase por "Pendiente" y "Aprobada" antes de "Contabilizada"; no se permiten saltos de estado.
@@ -307,3 +307,19 @@ Como Gerente de Finanzas, quiero configurar el período contable activo por defe
 - Quedan fuera de esta versión la conciliación bancaria automática, los impuestos configurables, el cierre de períodos y la integración automática con documentos de facturación.
 - La persistencia se mantiene entre sesiones del usuario; no se requiere un servidor central para esta versión del módulo.
 - Se espera un volumen inicial de hasta 500 asientos consultables sin degradación perceptible para el usuario.
+
+## Limitaciones Conocidas de la Implementación Actual
+
+*(Sección agregada el 2026-11-26 al sincronizar esta especificación con el código. Describe brechas confirmadas entre el comportamiento esperado por los requisitos anteriores y el comportamiento real del sistema hoy; no reemplaza ni debilita esos requisitos, que siguen vigentes como objetivo. El detalle técnico de cada punto está en `plan.md` y `data-model.md`; el trabajo pendiente está rastreado en `tasks.md`.)*
+
+- **Autenticación (FR-021, Assumptions)**: el inicio de sesión actual usa una contraseña de demostración compartida y visible en pantalla, no un mecanismo de credenciales individuales del ERP anfitrión.
+- **Designación de efectivo/bancos (FR-033, SC-013)**: el Panel General aplica una regla adicional basada en tipo y código de cuenta para ingresos de caja, mientras que el reporte de Flujo de Caja usa únicamente la designación explícita `es_efectivo`; ambas vistas pueden divergir en catálogos con varias cuentas de tipo Activo no marcadas como efectivo.
+- **Integridad de cuentas referenciadas (FR-034, SC-014)**: hoy se bloquea el borrado de una cuenta referenciada por asientos en Borrador, Pendiente o Aprobada, pero **no** se bloquea el borrado de una cuenta referenciada únicamente por asientos ya Contabilizados o Revertidos, que es el caso que más debería protegerse para preservar la trazabilidad histórica.
+- **Protección de jerarquía (FR-035)**: la prevención de ciclos y autorreferencias al asignar una cuenta padre ocurre únicamente en el formulario de cuentas, no en una capa reutilizable de validación de datos; la asignación de una cuenta inactiva como padre tampoco se bloquea de forma explícita.
+- **Borrado de usuarios y departamentos referenciados (FR-021, FR-023)**: no se verifica si un usuario o departamento está referenciado por algún asiento antes de permitir su eliminación del catálogo compartido.
+- **Bitácora de auditoría de cuentas (FR-037, SC-016)**: la creación, edición, desactivación y reactivación de cuentas no quedan registradas en la bitácora global de auditoría; solo las acciones sobre asientos (creación, aprobación, contabilización, reversa) se reflejan hoy en la vista de Auditoría.
+- **Período contable por defecto (FR-038)**: la vista de Configuración ofrece los presets de mes, trimestre y rango personalizado, pero Reportes y Centros de Costo permiten además seleccionar año y año anterior directamente en su propio filtro, fuera del período configurado por defecto.
+- **Validación del esquema local (FR-039)**: la versión del esquema de `localStorage` se verifica por presencia/igualdad, pero los datos almacenados no se validan en forma ni tipo al cargar.
+- **Aritmética monetaria (Assumptions)**: el límite de cuatro decimales y el rechazo sin redondeo se aplican al capturar un importe; los cálculos internos posteriores (sumas, balance, reversas) todavía usan aritmética de punto flotante estándar en lugar de una representación decimal exacta de extremo a extremo.
+- **Capacidad no contemplada originalmente**: el Panel General incluye una función de exportación a CSV no descrita en los requisitos funcionales anteriores.
+- **Cobertura de pruebas automatizadas**: algunas pruebas unitarias y de integración existentes no verifican aún el comportamiento que su nombre describe (aserciones vacías o que siempre pasan); esto no reduce el alcance de los requisitos, pero significa que su cumplimiento no está hoy confirmado por esas pruebas específicas.

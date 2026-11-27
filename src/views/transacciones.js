@@ -47,17 +47,12 @@ const filters = { busqueda: '', estado: '' };
 export function render() {
   bindEvents();
 
-  const entries = loadCollection('entries').records
-    .filter(Boolean)
+  const entries = loadCollection('entries')
+    .records.filter(Boolean)
     .slice()
-    .sort((left, right) =>
-      String(right.fecha_contable || '').localeCompare(String(left.fecha_contable || '')),
-    );
+    .sort((left, right) => String(right.fecha_contable || '').localeCompare(String(left.fecha_contable || '')));
   const accounts = loadCollection('accounts').records;
-  const departments = [
-    ...loadCollection('@erp-department-base').records,
-    ...loadCollection('centros-costo').records,
-  ];
+  const departments = [...loadCollection('@erp-department-base').records, ...loadCollection('centros-costo').records];
   const user = getCurrentUser();
   const counts = countByState(entries);
   const filtered = entries.filter((entry) => matchesFilters(entry, filters));
@@ -129,9 +124,7 @@ export function render() {
               </tr>
             </thead>
             <tbody id="entries-body">
-              ${entries
-                .map((entry) => renderEntryRow(entry, entries, accounts, departments, user || {}))
-                .join('')}
+              ${entries.map((entry) => renderEntryRow(entry, entries, accounts, departments, user || {})).join('')}
             </tbody>
           </table>
           <div class="no-results" id="no-results-entries"${noResultsHidden}>${escapeHtml(emptyMessage)}</div>
@@ -160,9 +153,7 @@ function bindEvents() {
   document.addEventListener('click', (event) => {
     const goButton = event.target.closest('#transacciones-view [data-go]');
     if (goButton) {
-      const nav = [...document.querySelectorAll('.nav-item')].find(
-        (item) => item.dataset.view === goButton.dataset.go,
-      );
+      const nav = [...document.querySelectorAll('.nav-item')].find((item) => item.dataset.view === goButton.dataset.go);
       if (nav) nav.click();
       return;
     }
@@ -219,9 +210,7 @@ function handleAction(action, button) {
     if (typeof sessionStorage !== 'undefined') {
       sessionStorage.setItem('editingEntryId', entry.id);
     }
-    const nav = [...document.querySelectorAll('.nav-item')].find(
-      (item) => item.dataset.view === 'nueva-transaccion',
-    );
+    const nav = [...document.querySelectorAll('.nav-item')].find((item) => item.dataset.view === 'nueva-transaccion');
     if (nav) nav.click();
     return;
   }
@@ -247,8 +236,7 @@ function transitionEntry(entry, action) {
     return;
   }
 
-  const prepared =
-    action === 'post' ? { ...entry, id_usuario_contabilizador: user.id } : entry;
+  const prepared = action === 'post' ? { ...entry, id_usuario_contabilizador: user.id } : entry;
   const result = advanceEntry(prepared, action === 'submit' ? null : user.id);
   if (!result.success) {
     notify(result.error || 'No se pudo completar la transición.', true);
@@ -268,9 +256,7 @@ function reversePostedEntry(entry, entries) {
     return;
   }
 
-  const existing = entries.find(
-    (item) => item.id_transaccion_revertida === entry.id && item.id !== entry.id,
-  );
+  const existing = entries.find((item) => item.id_transaccion_revertida === entry.id && item.id !== entry.id);
   if (existing) {
     notify(`Ya existe una reversa para este asiento: ${existing.id}.`, true);
     return;
@@ -336,9 +322,7 @@ function notify(message, isError = false) {
 function toggleDetails(button, entryId) {
   const root = document.querySelector('#transacciones-view');
   if (!root) return;
-  const detail = [...root.querySelectorAll('[data-detail-for]')].find(
-    (row) => row.dataset.detailFor === entryId,
-  );
+  const detail = [...root.querySelectorAll('[data-detail-for]')].find((row) => row.dataset.detailFor === entryId);
   if (!detail) return;
 
   const expanded = button.getAttribute('aria-expanded') === 'true';
@@ -373,9 +357,7 @@ function applyTableFilters() {
 function renderEntryRow(entry, entries, accounts, departments, user) {
   const lines = entry.detalles || [];
   const total = lines.reduce((sum, line) => sum + (Number(line.monto_debe) || 0), 0);
-  const hasReverse = entries.some(
-    (item) => item.id_transaccion_revertida === entry.id && item.id !== entry.id,
-  );
+  const hasReverse = entries.some((item) => item.id_transaccion_revertida === entry.id && item.id !== entry.id);
   const lockedActions = entry.estado !== ENTRY_STATE.BORRADOR;
   const editDisabled = lockedActions
     ? ` disabled title="${EDIT_LOCKED_MESSAGE}" style="${LOCKED_ACTION_STYLE}"`
@@ -557,13 +539,7 @@ function countByState(entries) {
 function matchesFilters(entry, currentFilters) {
   if (currentFilters.estado && entry.estado !== currentFilters.estado) return false;
   if (!currentFilters.busqueda) return true;
-  const searchText = [
-    entry.descripcion,
-    entry.numero_documento,
-    entry.tipo_documento,
-    entry.estado,
-    entry.id,
-  ]
+  const searchText = [entry.descripcion, entry.numero_documento, entry.tipo_documento, entry.estado, entry.id]
     .filter(Boolean)
     .join(' ')
     .toLocaleLowerCase('es');
@@ -577,9 +553,7 @@ function accountName(accounts, accountId) {
 
 function departmentName(departments, departmentId) {
   if (!departmentId) return 'Sin departamento';
-  const department = departments.find(
-    (item) => item.id === departmentId || item._id === departmentId,
-  );
+  const department = departments.find((item) => item.id === departmentId || item._id === departmentId);
   return department ? department.nombre || department.id : departmentId;
 }
 

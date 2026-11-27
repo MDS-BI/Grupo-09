@@ -1,26 +1,24 @@
-import { loadCollection, saveCollection } from '../storage.js'
-import { ENTRY_STATE } from '../domain/entry.js'
-import { logEvent } from './audit-service.js'
+import { loadCollection, saveCollection } from '../storage.js';
+import { ENTRY_STATE } from '../domain/entry.js';
+import { logEvent } from './audit-service.js';
 
 export function reverseEntry(entryId) {
-  const entries = loadCollection('entries').records
-  const entry = entries.find((e) => e.id === entryId)
+  const entries = loadCollection('entries').records;
+  const entry = entries.find((e) => e.id === entryId);
 
   if (!entry) {
-    return { success: false, error: 'Asiento no encontrado' }
+    return { success: false, error: 'Asiento no encontrado' };
   }
 
   // Reject reversals of non-Contabilizada entries
   if (entry.estado !== ENTRY_STATE.CONTABILIZADA) {
-    return { success: false, error: 'Solo se pueden revertir asientos Contabilizadas' }
+    return { success: false, error: 'Solo se pueden revertir asientos Contabilizadas' };
   }
 
   // Check for existing reverse
-  const existingReverse = entries.find(
-    (e) => e.id_transaccion_revertida === entryId
-  )
+  const existingReverse = entries.find((e) => e.id_transaccion_revertida === entryId);
   if (existingReverse) {
-    return { success: false, error: 'Ya existe una reversa para este asiento' }
+    return { success: false, error: 'Ya existe una reversa para este asiento' };
   }
 
   // Swap Debe/Haber for each line
@@ -28,10 +26,10 @@ export function reverseEntry(entryId) {
     id_cuenta: line.id_cuenta,
     id_departamento: line.id_departamento,
     numero_linea: line.numero_linea,
-    monto_debe: line.monto_haber >= 0 ? line.monto_haber : 0,
+    monto_debe: line.monto_haber > 0 ? line.monto_haber : 0,
     monto_haber: line.monto_debe > 0 ? line.monto_debe : 0,
     glosa: line.glosa + '(Reversa)',
-  }))
+  }));
 
   // Create the reverse entry
   const reverseEntry = {
@@ -50,19 +48,19 @@ export function reverseEntry(entryId) {
     creado_en: new Date().toISOString(),
     aprobado_en: null,
     contabilizado_en: null,
-  }
+  };
 
   // Save both entries atomically
-  entries.push(reverseEntry)
+  entries.push(reverseEntry);
 
   // Mark the original entry as reversed
-  const originalIndex = entries.findIndex((e) => e.id === entryId)
+  const originalIndex = entries.findIndex((e) => e.id === entryId);
   if (originalIndex >= 0) {
-    entries[originalIndex].estado = ENTRY_STATE.REVERTIDA
-    entries[originalIndex].id_transaccion_revertida = reverseEntry.id
+    entries[originalIndex].estado = ENTRY_STATE.REVERTIDA;
+    entries[originalIndex].id_transaccion_revertida = reverseEntry.id;
   }
 
-  saveCollection('entries', entries)
+  saveCollection('entries', entries);
 
   // Log audit events
   logEvent({
@@ -72,7 +70,7 @@ export function reverseEntry(entryId) {
     previousState: ENTRY_STATE.CONTABILIZADA,
     newState: ENTRY_STATE.REVERTIDA,
     metadata: { reverseId: reverseEntry.id },
-  })
+  });
 
   logEvent({
     type: 'reverse',
@@ -81,7 +79,7 @@ export function reverseEntry(entryId) {
     previousState: 'Nuevo',
     newState: ENTRY_STATE.REVERTIDA,
     metadata: { originalId: entryId },
-  })
+  });
 
-  return { success: true, reverseEntry }
+  return { success: true, reverseEntry };
 }
