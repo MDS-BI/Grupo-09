@@ -1,10 +1,6 @@
 import { loadCollection } from '../storage.js';
 import { ENTRY_STATE } from '../domain/entry.js';
-import {
-  filterEntries,
-  getDistinctAccounts,
-  getDistinctDepartments,
-} from '../services/query-service.js';
+import { filterEntries, getDistinctAccounts, getDistinctDepartments } from '../services/query-service.js';
 
 export const viewInfo = {
   title: 'Consulta',
@@ -13,14 +9,7 @@ export const viewInfo = {
   action: 'Nueva búsqueda',
 };
 
-const FILTER_KEYS = [
-  'busqueda_texto',
-  'fecha_desde',
-  'fecha_hasta',
-  'id_cuenta',
-  'id_departamento',
-  'estado',
-];
+const FILTER_KEYS = ['busqueda_texto', 'fecha_desde', 'fecha_hasta', 'id_cuenta', 'id_departamento', 'estado'];
 
 const filters = Object.fromEntries(FILTER_KEYS.map((key) => [key, '']));
 
@@ -166,9 +155,7 @@ function clearFilters() {
 }
 
 function isInvalidDateRange() {
-  return Boolean(
-    filters.fecha_desde && filters.fecha_hasta && filters.fecha_desde > filters.fecha_hasta,
-  );
+  return Boolean(filters.fecha_desde && filters.fecha_hasta && filters.fecha_desde > filters.fecha_hasta);
 }
 
 function syncDateRangeWarning() {
@@ -220,9 +207,9 @@ function runQuery(catalog) {
     results = results.filter((entry) => matchesMovementText(entry, filters.busqueda_texto, catalog));
   }
 
-  return results.slice().sort((left, right) =>
-    String(right.fecha_contable || '').localeCompare(String(left.fecha_contable || '')),
-  );
+  return results
+    .slice()
+    .sort((left, right) => String(right.fecha_contable || '').localeCompare(String(left.fecha_contable || '')));
 }
 
 function matchesFiltersLocally(entry) {

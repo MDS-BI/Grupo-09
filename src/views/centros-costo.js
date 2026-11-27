@@ -272,7 +272,7 @@ function renderResults() {
   `;
 }
 
-function loadDepartmentCatalog() {
+export function loadDepartmentCatalog() {
   const records = [...loadCollection('@erp-department-base').records, ...loadCollection('centros-costo').records];
   const byId = new Map();
   records.filter(Boolean).forEach((record) => {
@@ -283,7 +283,7 @@ function loadDepartmentCatalog() {
   return [...byId.values()];
 }
 
-function computeTotalsByDepartment(posted, catalog) {
+export function computeTotalsByDepartment(posted, catalog) {
   const accountsById = new Map(
     loadCollection('accounts')
       .records.filter(Boolean)

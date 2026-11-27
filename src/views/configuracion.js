@@ -1,4 +1,4 @@
-import { loadCollection, SCHEMA_VERSION } from '../storage.js';
+import { loadCollection, SCHEMA_VERSION, getStorageIntegrityReport } from '../storage.js';
 import { loadActivePeriod, loadConfiguredPeriod, saveActivePeriod } from '../services/settings-service.js';
 
 export const viewInfo = {
@@ -143,10 +143,24 @@ function getSchemaWarning() {
     }
   }
 
-  if (!mismatches.length) return '';
-  return `Se detectaron versiones de esquema incompatibles: ${mismatches.join(
-    ', ',
-  )}. Los datos se conservaron y se migraron a la versión ${SCHEMA_VERSION}.`;
+  const messages = [];
+  if (mismatches.length) {
+    messages.push(
+      `Se detectaron versiones de esquema incompatibles: ${mismatches.join(
+        ', ',
+      )}. Los datos se conservaron y se migraron a la versión ${SCHEMA_VERSION}.`,
+    );
+  }
+
+  const malformed = getStorageIntegrityReport().filter((entry) => entry.invalid > 0);
+  if (malformed.length) {
+    const detail = malformed.map((entry) => `${entry.name} (${entry.invalid})`).join(', ');
+    messages.push(
+      `Se encontraron registros con formato inválido en: ${detail}. Esos registros se conservaron en el almacenamiento local pero se excluyeron de los cálculos.`,
+    );
+  }
+
+  return messages.join(' ');
 }
 
 function ensureListeners() {

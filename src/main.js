@@ -229,7 +229,9 @@ dashboardView?.addEventListener('click', (event) => {
 
   const periodTab = event.target.closest('.period-tab');
   if (periodTab) {
-    dashboardView.querySelectorAll('.period-tab').forEach((item) => item.classList.toggle('selected', item === periodTab));
+    dashboardView
+      .querySelectorAll('.period-tab')
+      .forEach((item) => item.classList.toggle('selected', item === periodTab));
     return;
   }
 

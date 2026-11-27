@@ -1,107 +1,101 @@
-import { describe, it, expect, beforeEach } from 'vitest'
-import { buildIncomeStatement, buildCashFlow } from '../src/services/report-service.js'
-import { addEntry } from '../src/services/entry-service.js'
-import { addAccount } from '../src/services/account-service.js'
+import { describe, it, expect, beforeEach } from 'vitest';
+import { seedUsers, seedDepartments, seedAccounts } from '../src/utils/seed.js';
+import { buildReportData } from '../src/views/reportes.js';
+import { saveEntry } from '../src/services/entry-service.js';
 
-describe('US8: Reportes', () => {
+describe('US8: Reportes (real src/views/reportes.js)', () => {
   beforeEach(() => {
-    localStorage.removeItem('@erp-envelope:entries')
-    localStorage.removeItem('@erp-envelope:accounts')
-  })
+    localStorage.clear();
+    seedUsers();
+    seedDepartments();
+    seedAccounts();
+  });
 
-  it('should build income statement with account grouping', () => {
-    // Add Contabilizada entries with income and expense accounts
-    addEntry({
+  it('should build income statement grouping ingresos/gastos by account type', () => {
+    saveEntry({
       fecha_contable: '2026-10-15',
       tipo_documento: 'FACTURA',
       numero_documento: 'F-050',
-      descripcion: 'Asiento de prueba',
+      descripcion: 'Venta',
       moneda: 'USD',
       estado: 'Contabilizada',
-      detalles: [
-        { id_cuenta: '1', monto_debe: 100, monto_haber: 0, numero_linea: 1 },
-        { id_cuenta: '2', monto_debe: 0, monto_haber: 100, numero_linea: 2 },
-      ],
       id_usuario_creador: 'user-1',
-    })
+      detalles: [
+        { numero_linea: 1, id_cuenta: 'account-1', monto_debe: 100, monto_haber: 0 },
+        { numero_linea: 2, id_cuenta: 'account-2', monto_debe: 0, monto_haber: 100 },
+      ],
+    });
 
-    const statement = buildIncomeStatement({ from: '2026-01-01', to: '2026-12-31' })
-    expect(statement).toBeDefined()
-    expect(statement.ingresos).toBeDefined()
-    expect(statement.gastos).toBeDefined()
-    expect(statement.resultadoNeto).toBeDefined()
-  })
+    const data = buildReportData('2026-01-01', '2026-12-31');
+    expect(data.statement.ingresos).toBe(100);
+    expect(data.statement.gastos).toBe(0);
+    expect(data.statement.resultadoNeto).toBe(100);
+  });
 
   it('should calculate net result with 4-decimal precision', () => {
-    const statement = buildIncomeStatement({ from: '2026-01-01', to: '2026-12-31' })
-    
-    const decimalStr = statement.resultadoNeto.toString()
-    const decimalParts = decimalStr.split('.')
-    if (decimalParts.length > 1) {
-      expect(decimalParts[1].length).toBeLessThanOrEqual(4)
-    }
-  })
+    saveEntry({
+      fecha_contable: '2026-10-15',
+      tipo_documento: 'FACTURA',
+      numero_documento: 'F-050b',
+      descripcion: 'Venta con decimales',
+      moneda: 'USD',
+      estado: 'Contabilizada',
+      id_usuario_creador: 'user-1',
+      detalles: [
+        { numero_linea: 1, id_cuenta: 'account-1', monto_debe: 100.1234, monto_haber: 0 },
+        { numero_linea: 2, id_cuenta: 'account-2', monto_debe: 0, monto_haber: 100.1234 },
+      ],
+    });
 
-  it('should calculate cash-flow totals by es_efectivo', () => {
-    // Add an efectivo account
-    addAccount({
-      codigo: '1100',
-      nombre: 'Caja',
-      tipo: 'Activo',
-      naturaleza: 'Debe',
-      acepta_movimientos: true,
-      es_efectivo: true,
-      activa: true,
-    })
+    const data = buildReportData('2026-01-01', '2026-12-31');
+    expect(data.statement.resultadoNeto).toBe(100.1234);
+  });
 
-    const cashFlow = buildCashFlow({ from: '2026-01-01', to: '2026-12-31' })
-    expect(typeof cashFlow).toBe('number')
-  })
-
-  it('should exclude non-Contabilizadas entries from cash flow', () => {
-    // Add a Borrador entry
-    addEntry({
+  it('should calculate cash-flow totals strictly from es_efectivo', () => {
+    saveEntry({
       fecha_contable: '2026-10-15',
       tipo_documento: 'FACTURA',
       numero_documento: 'F-051',
-      descripcion: 'Borrador entry',
+      descripcion: 'Cobro en efectivo',
+      moneda: 'USD',
+      estado: 'Contabilizada',
+      id_usuario_creador: 'user-1',
+      detalles: [
+        { numero_linea: 1, id_cuenta: 'account-1', monto_debe: 250, monto_haber: 0 },
+        { numero_linea: 2, id_cuenta: 'account-2', monto_debe: 0, monto_haber: 250 },
+      ],
+    });
+
+    const data = buildReportData('2026-01-01', '2026-12-31');
+    expect(data.cashFlow).toBe(250);
+    expect(data.cashRows.every((row) => row.id === 'account-1')).toBe(true);
+  });
+
+  it('should exclude non-Contabilizada entries from both reports', () => {
+    saveEntry({
+      fecha_contable: '2026-10-15',
+      tipo_documento: 'FACTURA',
+      numero_documento: 'F-052',
+      descripcion: 'Borrador',
       moneda: 'USD',
       estado: 'Borrador',
-      detalles: [
-        { id_cuenta: '1', monto_debe: 50, monto_haber: 0, numero_linea: 1 },
-        { id_cuenta: '2', monto_debe: 0, monto_haber: 50, numero_linea: 2 },
-      ],
       id_usuario_creador: 'user-1',
-    })
+      detalles: [
+        { numero_linea: 1, id_cuenta: 'account-1', monto_debe: 999, monto_haber: 0 },
+        { numero_linea: 2, id_cuenta: 'account-2', monto_debe: 0, monto_haber: 999 },
+      ],
+    });
 
-    const cashFlow = buildCashFlow({ from: '2026-01-01', to: '2026-12-31' })
-    // Borrador should be excluded, so cash flow should only include Contabilizadas
-  })
+    const data = buildReportData('2026-01-01', '2026-12-31');
+    expect(data.statement.ingresos).toBe(0);
+    expect(data.cashFlow).toBe(0);
+  });
 
-  it('should handle empty period', () => {
-    const statement = buildIncomeStatement({ from: '2025-01-01', to: '2025-12-31' })
-    expect(statement.ingresos).toBe(0)
-    expect(statement.gastos).toBe(0)
-    expect(statement.resultadoNeto).toBe(0)
-  })
-
-  it('should have dashboard/report designation parity for es_efectivo', () => {
-    // Add efectivo account
-    addAccount({
-      codigo: '1100',
-      nombre: 'Caja',
-      tipo: 'Activo',
-      naturaleza: 'Debe',
-      acepta_movimientos: true,
-      es_efectivo: true,
-      activa: true,
-    })
-
-    const cashFlow = buildCashFlow({ from: '2026-01-01', to: '2026-12-31' })
-    const statement = buildIncomeStatement({ from: '2026-01-01', to: '2026-12-31' })
-
-    // Both should respect es_efectivo designation
-    expect(cashFlow).toBeDefined()
-    expect(statement).toBeDefined()
-  })
-})
+  it('should handle an empty period with zero totals', () => {
+    const data = buildReportData('2025-01-01', '2025-12-31');
+    expect(data.statement.ingresos).toBe(0);
+    expect(data.statement.gastos).toBe(0);
+    expect(data.statement.resultadoNeto).toBe(0);
+    expect(data.cashFlow).toBe(0);
+  });
+});

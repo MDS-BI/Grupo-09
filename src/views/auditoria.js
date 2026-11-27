@@ -176,9 +176,7 @@ function renderDetail(event) {
     if (['userId', 'approverId', 'actorId'].includes(key)) return;
     parts.push(`${prettify(key)}: ${value}`);
   });
-  return parts.length
-    ? escapeHtml(parts.join(' · '))
-    : '<span style="color: #8792a2">Sin detalles adicionales</span>';
+  return parts.length ? escapeHtml(parts.join(' · ')) : '<span style="color: #8792a2">Sin detalles adicionales</span>';
 }
 
 function resolveUser(event, users, activeUser) {

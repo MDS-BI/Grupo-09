@@ -1,18 +1,15 @@
-import { loadCollection } from '../storage.js'
-import { addAccount, updateAccount } from '../domain/account.js'
-import {
-  checkAccountIntegrity,
-  deleteAccount as deleteAccountService,
-} from '../services/account-service.js'
+import { loadCollection } from '../storage.js';
+import { addAccount, updateAccount } from '../domain/account.js';
+import { checkAccountIntegrity, deleteAccount as deleteAccountService } from '../services/account-service.js';
 
-let editingId = null
+let editingId = null;
 
 export const viewInfo = {
   title: 'Plan de cuentas',
   breadcrumb: 'Plan de cuentas',
   description: 'Organiza las cuentas contables y consulta su clasificación financiera.',
   action: 'Nueva cuenta contable',
-}
+};
 
 function getNatureSuggestion(tipo) {
   const sugerencias = {
@@ -21,23 +18,23 @@ function getNatureSuggestion(tipo) {
     Patrimonio: 'Haber',
     Ingreso: 'Haber',
     Gasto: 'Debe',
-  }
-  return sugerencias[tipo] || 'Debe'
+  };
+  return sugerencias[tipo] || 'Debe';
 }
 
 function renderAccountForm(account = {}, allAccounts = []) {
-  const isEditing = editingId !== null
-  const acc = allAccounts.find((a) => a.id === account.id) || account
-  const tipo = acc.tipo || 'Activo'
-  const naturaleza = acc.naturaleza || getNatureSuggestion(tipo)
+  const isEditing = editingId !== null;
+  const acc = allAccounts.find((a) => a.id === account.id) || account;
+  const tipo = acc.tipo || 'Activo';
+  const naturaleza = acc.naturaleza || getNatureSuggestion(tipo);
 
   const parentOptions = allAccounts
     .filter((a) => a.id !== account.id)
     .map((a) => {
-      const selected = a.id === acc.id_cuenta_padre ? 'selected' : ''
-      return `<option value="${a.id}" ${selected}>${a.codigo} - ${a.nombre}</option>`
+      const selected = a.id === acc.id_cuenta_padre ? 'selected' : '';
+      return `<option value="${a.id}" ${selected}>${a.codigo} - ${a.nombre}</option>`;
     })
-    .join('')
+    .join('');
 
   const tipoOptions = `
     <option value="Activo" ${tipo === 'Activo' ? 'selected' : ''}>Activo</option>
@@ -45,17 +42,17 @@ function renderAccountForm(account = {}, allAccounts = []) {
     <option value="Patrimonio" ${tipo === 'Patrimonio' ? 'selected' : ''}>Patrimonio</option>
     <option value="Ingreso" ${tipo === 'Ingreso' ? 'selected' : ''}>Ingreso</option>
     <option value="Gasto" ${tipo === 'Gasto' ? 'selected' : ''}>Gasto</option>
-  `
+  `;
 
   const naturalezaOptions = `
     <option value="Debe" ${naturaleza === 'Debe' ? 'selected' : ''}>Debe</option>
     <option value="Haber" ${naturaleza === 'Haber' ? 'selected' : ''}>Haber</option>
-  `
+  `;
 
   const activaOptions = `
     <option value="true" ${acc.activa !== false ? 'selected' : ''}>Sí</option>
     <option value="false" ${acc.activa === false ? 'selected' : ''}>No</option>
-  `
+  `;
 
   return `
         <style>
@@ -171,43 +168,44 @@ function renderAccountForm(account = {}, allAccounts = []) {
         <div id="account-list">${renderAccountList(allAccounts)}</div>
       </div>
     </section>
-  `
+  `;
 }
 
 function renderAccountList(accounts) {
-  const accountsFilter = accounts || []
+  const accountsFilter = accounts || [];
 
   if (accountsFilter.length === 0) {
-    return `<p style="text-align: center; color: #777; padding: 20px">No hay cuentas registradas</p>`
+    return `<p style="text-align: center; color: #777; padding: 20px">No hay cuentas registradas</p>`;
   }
 
-  let html = ''
+  let html = '';
   accountsFilter.forEach((account) => {
-    const integrity = checkAccountIntegrity(account.id)
+    const integrity = checkAccountIntegrity(account.id);
 
-    const padreCuenta = accountsFilter.find((a) => a.id === account.id_cuenta_padre)
-    const padreNombre = padreCuenta ? padreCuenta.nombre : 'Ninguna'
+    const padreCuenta = accountsFilter.find((a) => a.id === account.id_cuenta_padre);
+    const padreNombre = padreCuenta ? padreCuenta.nombre : 'Ninguna';
 
     const tipoBadge = `
       <span class="badge badge-tipo ${account.tipo.toLowerCase()}" title="${account.tipo}">${account.tipo}</span>
-    `
+    `;
     const naturalezaBadge = `
       <span class="badge badge-naturaleza ${account.naturaleza.toLowerCase()}" title="${account.naturaleza}">${account.naturaleza}</span>
-    `
+    `;
     const estadoBadge = `
       <span class="badge badge-estado ${account.activa === true ? 'badge-activo' : 'badge-inactivo'}" title="${account.activa === true ? 'Activa' : 'Inactiva'}">${account.activa === true ? 'Activa' : 'Inactiva'}</span>
-    `
+    `;
 
-    const canDelete = integrity.allowed
+    const canDelete = integrity.allowed;
     const deleteBtn = canDelete
       ? `<button type="button" class="text-link" data-action="delete" data-account-id="${account.id}">Eliminar</button>`
-      : ''
+      : '';
 
-    const editBtn = `<button type="button" class="text-link" data-action="edit" data-account-id="${account.id}">Editar</button>`
+    const editBtn = `<button type="button" class="text-link" data-action="edit" data-account-id="${account.id}">Editar</button>`;
 
-    const toggleActiveBtn = account.activa === false
-      ? `<button type="button" class="text-link success" data-action="activar" data-account-id="${account.id}">Activar</button>`
-      : `<button type="button" class="text-link danger" data-action="desactivar" data-account-id="${account.id}">Desactivar</button>`
+    const toggleActiveBtn =
+      account.activa === false
+        ? `<button type="button" class="text-link success" data-action="activar" data-account-id="${account.id}">Activar</button>`
+        : `<button type="button" class="text-link danger" data-action="desactivar" data-account-id="${account.id}">Desactivar</button>`;
 
     html += `
       <div style="border: 1px solid #e0e7ff; border-radius: 8px; padding: 16px; margin: 8px 0; background: #f8fbff; display: grid; grid-template-columns: 1fr auto; gap: 12px; align-items: start">
@@ -235,220 +233,183 @@ function renderAccountList(accounts) {
         </div>
         ${!canDelete ? `<div style="margin-top: 8px; font-size: 8px; color: #d98260; align-self: center; justify-self: end; width: 100%;">${integrity.reason || 'No se puede eliminar'}</div>` : ''}
       </div>
-    `
-  })
+    `;
+  });
 
-  return `<div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 16px;">${html}</div>`
+  return `<div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 16px;">${html}</div>`;
 }
 
 export function render() {
-  const accounts = loadCollection('accounts').records
-  editingId = null
-  queueMicrotask(bindViewListeners)
-  return renderAccountForm({}, accounts)
+  const accounts = loadCollection('accounts').records;
+  editingId = null;
+  queueMicrotask(bindViewListeners);
+  return renderAccountForm({}, accounts);
 }
 
 function refreshView() {
-  const currentView = document.querySelector('.accounts-view')
-  if (!currentView) return
+  const currentView = document.querySelector('.accounts-view');
+  if (!currentView) return;
 
-  const editingAccount = editingId
-    ? loadCollection('accounts').records.find((a) => a.id === editingId) || {}
-    : {}
-  const container = document.createElement('div')
-  container.innerHTML = renderAccountForm(editingAccount, loadCollection('accounts').records)
-  currentView.replaceWith(container.querySelector('.accounts-view'))
-  bindViewListeners()
+  const editingAccount = editingId ? loadCollection('accounts').records.find((a) => a.id === editingId) || {} : {};
+  const container = document.createElement('div');
+  container.innerHTML = renderAccountForm(editingAccount, loadCollection('accounts').records);
+  currentView.replaceWith(container.querySelector('.accounts-view'));
+  bindViewListeners();
 }
 
 function bindViewListeners() {
-  const form = document.querySelector('.accounts-view #account-form')
+  const form = document.querySelector('.accounts-view #account-form');
   if (form && !form.dataset.bound) {
-    form.dataset.bound = 'true'
-    form.addEventListener('submit', handleFormSubmit)
+    form.dataset.bound = 'true';
+    form.addEventListener('submit', handleFormSubmit);
   }
 
-  const cancelButton = document.querySelector('.accounts-view #cancel-account')
+  const cancelButton = document.querySelector('.accounts-view #cancel-account');
   if (cancelButton && !cancelButton.dataset.bound) {
-    cancelButton.dataset.bound = 'true'
-    cancelButton.addEventListener('click', handleCancel)
+    cancelButton.dataset.bound = 'true';
+    cancelButton.addEventListener('click', handleCancel);
   }
 
-  bindAccountListListeners()
+  bindAccountListListeners();
 }
 
 class ValidationError extends Error {}
 
-function saveToAudit(action, accountData) {
-  let auditLogs = JSON.parse(localStorage.getItem('accountAuditLogs') || '[]')
-  auditLogs.push({
-    id: Date.now(),
-    action,
-    timestamp: new Date().toISOString(),
-    account: {
-      id: accountData.id,
-      codigo: accountData.codigo,
-      nombre: accountData.nombre,
-      tipo: accountData.tipo,
-      naturaleza: accountData.naturaleza,
-    }
-  })
-  // Keep only last 50 logs
-  if (auditLogs.length > 50) auditLogs = auditLogs.slice(-50)
-  localStorage.setItem('accountAuditLogs', JSON.stringify(auditLogs))
-}
-
 function suggestNatureFromType() {
-  const tipoSelect = document.querySelector('#account-tipo')
-  const naturalezaSelect = document.querySelector('#account-naturaleza')
-  if (!tipoSelect || !naturalezaSelect) return
+  const tipoSelect = document.querySelector('#account-tipo');
+  const naturalezaSelect = document.querySelector('#account-naturaleza');
+  if (!tipoSelect || !naturalezaSelect) return;
 
   tipoSelect.addEventListener('change', (e) => {
-    const sugerida = getNatureSuggestion(e.target.value)
-    naturalezaSelect.value = sugerida
-  })
+    const sugerida = getNatureSuggestion(e.target.value);
+    naturalezaSelect.value = sugerida;
+  });
 }
 
 function bindAccountListListeners() {
-  const buscador = document.querySelector('#buscador-cuentas')
-  const filtroTipo = document.querySelector('#filtro-tipo')
-  const filtroEstado = document.querySelector('#filtro-estado')
+  const buscador = document.querySelector('#buscador-cuentas');
+  const filtroTipo = document.querySelector('#filtro-tipo');
+  const filtroEstado = document.querySelector('#filtro-estado');
 
   // Auto-suggest nature based on type
-  suggestNatureFromType()
+  suggestNatureFromType();
 
   // Apply filters and search
   function applyFilters() {
-    const term = (buscador || {}).value.trim().toLowerCase() || ''
-    const tipoSel = (filtroTipo || {}).value || ''
-    const estadoSel = (filtroEstado || {}).value || ''
+    const term = (buscador || {}).value.trim().toLowerCase() || '';
+    const tipoSel = (filtroTipo || {}).value || '';
+    const estadoSel = (filtroEstado || {}).value || '';
 
-    let filtered = loadCollection('accounts').records
+    let filtered = loadCollection('accounts').records;
 
     if (tipoSel) {
-      filtered = filtered.filter(a => a.tipo === tipoSel)
+      filtered = filtered.filter((a) => a.tipo === tipoSel);
     }
     if (estadoSel) {
-      filtered = filtered.filter(a => a.activa === (estadoSel === 'activa'))
+      filtered = filtered.filter((a) => a.activa === (estadoSel === 'activa'));
     }
     if (term) {
-      filtered = filtered.filter(a =>
-        a.codigo.toLowerCase().includes(term) || a.nombre.toLowerCase().includes(term)
-      )
+      filtered = filtered.filter((a) => a.codigo.toLowerCase().includes(term) || a.nombre.toLowerCase().includes(term));
     }
 
-    const listDiv = document.querySelector('#account-list')
+    const listDiv = document.querySelector('#account-list');
     if (listDiv) {
-      listDiv.innerHTML = renderAccountList(filtered)
+      listDiv.innerHTML = renderAccountList(filtered);
     }
-    bindAccountListListeners()
+    bindAccountListListeners();
   }
 
-  if (buscador) buscador.addEventListener('input', applyFilters)
-  if (filtroTipo) filtroTipo.addEventListener('change', applyFilters)
-  if (filtroEstado) filtroEstado.addEventListener('change', applyFilters)
+  if (buscador) buscador.addEventListener('input', applyFilters);
+  if (filtroTipo) filtroTipo.addEventListener('change', applyFilters);
+  if (filtroEstado) filtroEstado.addEventListener('change', applyFilters);
 
   document
     .querySelectorAll(
-      '.accounts-view [data-action="edit"], .accounts-view [data-action="delete"], .accounts-view [data-action="desactivar"], .accounts-view [data-action="activar"]'
+      '.accounts-view [data-action="edit"], .accounts-view [data-action="delete"], .accounts-view [data-action="desactivar"], .accounts-view [data-action="activar"]',
     )
     .forEach((btn) => {
-      if (btn.dataset.bound) return
-      btn.dataset.bound = 'true'
+      if (btn.dataset.bound) return;
+      btn.dataset.bound = 'true';
 
       btn.addEventListener('click', () => {
-        const accountId = btn.dataset.accountId
-        const action = btn.dataset.action
+        const accountId = btn.dataset.accountId;
+        const action = btn.dataset.action;
 
         if (action === 'edit') {
-          startEditing(accountId)
-          return
+          startEditing(accountId);
+          return;
         }
 
         if (action === 'activar') {
           try {
-            const result = updateAccount(accountId, { activa: true })
+            const result = updateAccount(accountId, { activa: true });
             if (!result.success) {
-              showError(result.error || 'No se pudo activar la cuenta')
-              return
+              showError(result.error || 'No se pudo activar la cuenta');
+              return;
             }
-            showToast('Cuenta activada correctamente')
-            saveToAudit('activar', { id: accountId, codigo: '', nombre: '', tipo: '', naturaleza: '' })
-            refreshView()
+            showToast('Cuenta activada correctamente');
+            refreshView();
           } catch (error) {
-            showError(`No se pudo activar la cuenta: ${getErrorMessage(error)}`)
+            showError(`No se pudo activar la cuenta: ${getErrorMessage(error)}`);
           }
-          return
+          return;
         }
 
         if (action === 'desactivar') {
           try {
-            const result = updateAccount(accountId, { activa: false })
+            const result = updateAccount(accountId, { activa: false });
             if (!result.success) {
-              showError(result.error || 'No se pudo desactivar la cuenta')
-              return
+              showError(result.error || 'No se pudo desactivar la cuenta');
+              return;
             }
-            showToast('Cuenta desactivada correctamente')
-            saveToAudit('desactivar', { id: accountId, codigo: '', nombre: '', tipo: '', naturaleza: '' })
-            refreshView()
+            showToast('Cuenta desactivada correctamente');
+            refreshView();
           } catch (error) {
-            showError(`No se pudo desactivar la cuenta: ${getErrorMessage(error)}`)
+            showError(`No se pudo desactivar la cuenta: ${getErrorMessage(error)}`);
           }
-          return
+          return;
         }
 
-        // Delete action - check for associated movements
+        // Delete action - account-service.checkAccountIntegrity already gates
+        // whether the button is rendered; deleteAccountService re-checks before removing.
         if (action === 'delete') {
           try {
-            const journals = JSON.parse(localStorage.getItem('journals') || '[]')
-            const hasMovements = journals.some(j =>
-              j.lines.some(line => line.id_cuenta === accountId)
-            )
-
-            if (hasMovements) {
-              showError('No se puede eliminar esta cuenta porque tiene movimientos asociados en los asientos contables. Desactive la cuenta en su lugar.')
-              return
-            }
-
-            const result = deleteAccountService(accountId)
+            const result = deleteAccountService(accountId);
             if (!result.success) {
-              showError(result.error || 'No se pudo eliminar la cuenta')
-              return
+              showError(result.error || 'No se pudo eliminar la cuenta');
+              return;
             }
-            showToast('Cuenta eliminada correctamente')
-            saveToAudit('eliminar', { id: accountId, codigo: '', nombre: '', tipo: '', naturaleza: '' })
-            refreshView()
+            showToast('Cuenta eliminada correctamente');
+            refreshView();
           } catch (error) {
-            showError(`No se pudo eliminar la cuenta: ${getErrorMessage(error)}`)
+            showError(`No se pudo eliminar la cuenta: ${getErrorMessage(error)}`);
           }
-          return
+          return;
         }
-      })
-    })
+      });
+    });
 }
 
 function handleFormSubmit(event) {
-  event.preventDefault()
+  event.preventDefault();
 
-  const form = event.currentTarget
-  const codigo = form.querySelector('#account-codigo').value.trim()
-  const nombre = form.querySelector('#account-nombre').value.trim()
-  const tipo = form.querySelector('#account-tipo').value
-  const naturaleza = form.querySelector('#account-naturaleza').value
-  const id_cuenta_padre = form.querySelector('#account-padre').value
-  const activa = form.querySelector('#account-activa').value === 'true'
+  const form = event.currentTarget;
+  const codigo = form.querySelector('#account-codigo').value.trim();
+  const nombre = form.querySelector('#account-nombre').value.trim();
+  const tipo = form.querySelector('#account-tipo').value;
+  const naturaleza = form.querySelector('#account-naturaleza').value;
+  const id_cuenta_padre = form.querySelector('#account-padre').value;
+  const activa = form.querySelector('#account-activa').value === 'true';
 
-  const existingAccounts = loadCollection('accounts').records
-  const currentAccount = editingId
-    ? existingAccounts.find((a) => a.id === editingId)
-    : null
+  const existingAccounts = loadCollection('accounts').records;
+  const currentAccount = editingId ? existingAccounts.find((a) => a.id === editingId) : null;
 
   // Auto-suggest nature if still default
-  const naturalezaInput = form.querySelector('#account-naturaleza')
+  const naturalezaInput = form.querySelector('#account-naturaleza');
   if (naturalezaInput && !currentAccount) {
-    const sugerida = getNatureSuggestion(tipo)
+    const sugerida = getNatureSuggestion(tipo);
     if (naturalezaInput.value === 'Debe' || naturalezaInput.value === 'Haber') {
-      naturalezaInput.value = sugerida
+      naturalezaInput.value = sugerida;
     }
   }
 
@@ -461,128 +422,93 @@ function handleFormSubmit(event) {
     activa,
     acepta_movimientos: currentAccount?.acepta_movimientos ?? true,
     es_efectivo: currentAccount?.es_efectivo ?? false,
-  }
+  };
 
   try {
-    const codeExists = existingAccounts.some(
-      (a) => a.codigo === codigo && a.id !== editingId
-    )
+    const codeExists = existingAccounts.some((a) => a.codigo === codigo && a.id !== editingId);
     if (codeExists) {
-      throw new ValidationError('Ya existe una cuenta con ese código')
+      throw new ValidationError('Ya existe una cuenta con ese código');
     }
 
-    if (id_cuenta_padre && id_cuenta_padre === editingId) {
-      throw new ValidationError('Una cuenta no puede ser su propia padre')
-    }
-
-    const integrity = editingId !== null ? checkAccountIntegrity(editingId) : null
-    if (integrity && integrity.allowed === false && /ciclo/i.test(integrity.reason || '')) {
-      throw new ValidationError(integrity.reason)
-    }
-
-    if (creaCicloJerarquico(editingId, id_cuenta_padre, existingAccounts)) {
-      throw new ValidationError('No se puede crear un ciclo jerárquico con la cuenta padre seleccionada')
-    }
-
-    const result = editingId !== null
-      ? updateAccount(editingId, account)
-      : addAccount(account)
+    // Self-parent, inactive-parent and hierarchy-cycle checks are enforced by
+    // accountValidator in src/domain/account.js (the single source for this rule).
+    const result = editingId !== null ? updateAccount(editingId, account) : addAccount(account);
 
     if (!result.success) {
-      const errorMsg = result.errors?.length > 0
-        ? result.errors.join('; ')
-        : result.error || 'Error desconocido'
-      throw new Error(errorMsg)
+      const errorMsg = result.errors?.length > 0 ? result.errors.join('; ') : result.error || 'Error desconocido';
+      throw new Error(errorMsg);
     }
 
-    showToast(editingId !== null ? 'Cuenta actualizada correctamente' : 'Cuenta guardada correctamente')
-    editingId = null
-    clearError()
-    refreshView()
-
-    // Save to audit log
-    const savedAccount = { ...account, id: editingId || Date.now() }
-    saveToAudit(editingId !== null ? 'editar' : 'crear', savedAccount)
+    showToast(editingId !== null ? 'Cuenta actualizada correctamente' : 'Cuenta guardada correctamente');
+    editingId = null;
+    clearError();
+    refreshView();
   } catch (error) {
-    showError(error instanceof ValidationError
-      ? error.message
-      : `No se pudo guardar la cuenta: ${getErrorMessage(error)}`)
+    showError(
+      error instanceof ValidationError ? error.message : `No se pudo guardar la cuenta: ${getErrorMessage(error)}`,
+    );
   }
-}
-
-function creaCicloJerarquico(accountId, parentId, accounts) {
-  if (!accountId || !parentId) return false
-
-  const visited = new Set()
-  let currentId = parentId
-  while (currentId) {
-    if (currentId === accountId || visited.has(currentId)) return true
-    visited.add(currentId)
-    const current = accounts.find((a) => a.id === currentId)
-    currentId = current?.id_cuenta_padre || null
-  }
-  return false
 }
 
 function startEditing(accountId) {
-  const account = loadCollection('accounts').records.find((a) => a.id === accountId)
+  const account = loadCollection('accounts').records.find((a) => a.id === accountId);
   if (!account) {
-    showError('Cuenta no encontrada')
-    return
+    showError('Cuenta no encontrada');
+    return;
   }
 
-  editingId = accountId
-  clearError()
-  refreshView()
+  editingId = accountId;
+  clearError();
+  refreshView();
   document
     .querySelector('.accounts-view .account-form-section')
-    ?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
 function handleCancel() {
-  editingId = null
-  clearError()
-  refreshView()
+  editingId = null;
+  clearError();
+  refreshView();
 }
 
 function clearError() {
-  document.querySelectorAll('.accounts-view .account-error').forEach((el) => el.remove())
+  document.querySelectorAll('.accounts-view .account-error').forEach((el) => el.remove());
 }
 
 function showError(message) {
-  const view = document.querySelector('.accounts-view')
-  if (!view) return
+  const view = document.querySelector('.accounts-view');
+  if (!view) return;
 
-  view.querySelectorAll('.account-error').forEach((el) => el.remove())
+  view.querySelectorAll('.account-error').forEach((el) => el.remove());
 
-  const banner = document.createElement('div')
-  banner.className = 'account-error'
-  banner.setAttribute('role', 'alert')
-  banner.setAttribute('aria-live', 'assertive')
-  banner.textContent = message
-  banner.style.color = '#b42318'
-  banner.style.background = '#fee4e2'
-  banner.style.border = '1px solid #fda29b'
-  banner.style.padding = '10px 12px'
-  banner.style.borderRadius = '6px'
-  banner.style.margin = '12px 0'
-  banner.style.fontSize = '12px'
-  banner.style.fontWeight = '600'
+  const banner = document.createElement('div');
+  banner.className = 'account-error';
+  banner.setAttribute('role', 'alert');
+  banner.setAttribute('aria-live', 'assertive');
+  banner.textContent = message;
+  banner.style.color = '#b42318';
+  banner.style.background = '#fee4e2';
+  banner.style.border = '1px solid #fda29b';
+  banner.style.padding = '10px 12px';
+  banner.style.borderRadius = '6px';
+  banner.style.margin = '12px 0';
+  banner.style.fontSize = '12px';
+  banner.style.fontWeight = '600';
 
-  const heading = view.querySelector('.panel-heading')
-  if (heading) heading.after(banner)
-  else view.prepend(banner)
+  const heading = view.querySelector('.panel-heading');
+  if (heading) heading.after(banner);
+  else view.prepend(banner);
 }
 
 function getErrorMessage(error) {
-  return error instanceof Error ? error.message : String(error)
+  return error instanceof Error ? error.message : String(error);
 }
 
 function showToast(message) {
-  const toast = document.querySelector('#toast')
-  if (!toast) return
-  toast.textContent = message
-  toast.classList.add('show')
-  window.clearTimeout(showToast.timer)
-  showToast.timer = window.setTimeout(() => toast.classList.remove('show'), 2600)
+  const toast = document.querySelector('#toast');
+  if (!toast) return;
+  toast.textContent = message;
+  toast.classList.add('show');
+  window.clearTimeout(showToast.timer);
+  showToast.timer = window.setTimeout(() => toast.classList.remove('show'), 2600);
 }
